@@ -128,7 +128,6 @@ class BrokerAdapterFactory:
                 "port": int(get_config_value("FUTU_PORT", "11111")),
                 "market": get_config_value("FUTU_MARKET", "US"),
                 "security_firm": get_config_value("FUTU_SECURITY_FIRM", ""),
-                "real_trade": get_config_value("FUTU_REAL_TRADE", "false").lower() == "true",
             })
 
         return config
