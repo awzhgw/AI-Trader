@@ -15,7 +15,7 @@ class AIPositionManager:
     def __init__(self, broker_type: str, account_id: str = "default"):
         """
         Args:
-            broker_type: "xtquant" | "futu" | "mock"
+            broker_type: "gjzj" | "futu" | "mock"
             account_id: 账户ID
         """
         self.broker_type = broker_type

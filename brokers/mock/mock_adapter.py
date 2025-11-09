@@ -35,9 +35,8 @@ class MockAdapter(BaseBroker):
     @classmethod
     def create_from_config(cls) -> 'MockAdapter':
         """从环境变量创建适配器"""
-        config = {
-            "account_id": get_config_value("SIGNATURE", "default")
-        }
+        from brokers.broker_factory import BrokerAdapterFactory
+        config = BrokerAdapterFactory.get_broker_config("mock")
         return cls(config)
 
     def _get_broker_type(self) -> str:

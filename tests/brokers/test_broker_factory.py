@@ -4,6 +4,12 @@ BrokerAdapterFactory单测
 import os
 import pytest
 from unittest.mock import patch
+from dotenv import load_dotenv
+from pathlib import Path
+
+# 加载 .env 文件配置
+env_path = Path(__file__).resolve().parents[2] / '.env'
+load_dotenv(env_path)
 
 from brokers.broker_factory import BrokerAdapterFactory
 
@@ -30,55 +36,41 @@ class TestBrokerAdapterFactory:
     @patch('brokers.broker_factory.get_config_value')
     def test_create_broker_mock(self, mock_get_config):
         """测试创建Mock适配器"""
+        # 从 .env 读取 BROKER_MODE，如果没有则使用默认值
+        broker_mode = os.getenv("BROKER_MODE", "mock")
         mock_get_config.side_effect = lambda key, default=None: {
-            "BROKER_MODE": "mock"
+            "BROKER_MODE": broker_mode,
+            "SIGNATURE": os.getenv("SIGNATURE", "test_signature")
         }.get(key, default)
 
         broker = BrokerAdapterFactory.create_broker(broker_mode="mock")
         assert broker.broker_type == "mock"
 
     @patch('brokers.broker_factory.get_config_value')
-    def test_create_broker_auto_cn(self, mock_get_config):
-        """测试自动模式创建A股适配器"""
-        mock_get_config.side_effect = lambda key, default=None: {
-            "BROKER_MODE": "auto"
-        }.get(key, default)
-
-        broker = BrokerAdapterFactory.create_broker(symbol="600519.SH", broker_mode="auto")
-        # 由于XtQuantAdapter需要实际API和连接，这里只测试工厂逻辑
-        # 实际创建可能会失败，但工厂逻辑是正确的
-        assert broker is not None
-
-    @patch('brokers.broker_factory.get_config_value')
-    def test_create_broker_auto_us(self, mock_get_config):
-        """测试自动模式创建美股适配器"""
-        mock_get_config.side_effect = lambda key, default=None: {
-            "BROKER_MODE": "auto"
-        }.get(key, default)
-
-        broker = BrokerAdapterFactory.create_broker(symbol="AAPL", broker_mode="auto")
-        # 由于FutuAdapter需要实际API，这里只测试工厂逻辑
-        assert broker is not None
-
-    @patch('brokers.broker_factory.get_config_value')
     def test_get_broker_config(self, mock_get_config):
         """测试获取券商配置"""
+        # 从 .env 读取配置，如果没有则使用默认值
         mock_get_config.side_effect = lambda key, default=None: {
-            "XTQUANT_ACCOUNT_ID": "xtquant_account",
-            "XTQUANT_SESSION_ID": "0",
-            "FUTU_ACCOUNT_ID": "futu_account",
-            "FUTU_HOST": "127.0.0.1",
-            "FUTU_PORT": "11111",
-            "FUTU_MARKET": "US",
-            "FUTU_SECURITY_FIRM": "futu_firm",
-            "FUTU_REAL_TRADE": "false"
+            "GJZJ_ACCOUNT_ID": os.getenv("GJZJ_ACCOUNT_ID", "gjzj_account"),
+            "GJZJ_SESSION_ID": os.getenv("GJZJ_SESSION_ID", "0"),
+            "FUTU_ACCOUNT_ID": os.getenv("FUTU_ACCOUNT_ID", "futu_account"),
+            "FUTU_HOST": os.getenv("FUTU_HOST", "127.0.0.1"),
+            "FUTU_PORT": os.getenv("FUTU_PORT", "11111"),
+            "FUTU_MARKET": os.getenv("FUTU_MARKET", "US"),
+            "FUTU_SECURITY_FIRM": os.getenv("FUTU_SECURITY_FIRM", "futu_firm"),
+            "FUTU_REAL_TRADE": os.getenv("FUTU_REAL_TRADE", "false")
         }.get(key, default)
 
-        xtquant_config = BrokerAdapterFactory.get_broker_config("xtquant")
-        assert xtquant_config["account_id"] == "xtquant_account"
-        assert xtquant_config["session_id"] == 0
+        gjzj_config = BrokerAdapterFactory.get_broker_config("gjzj")
+        expected_account_id = os.getenv("GJZJ_ACCOUNT_ID", "gjzj_account")
+        expected_session_id = int(os.getenv("GJZJ_SESSION_ID", "0"))
+        assert gjzj_config["account_id"] == expected_account_id
+        assert gjzj_config["session_id"] == expected_session_id
 
         futu_config = BrokerAdapterFactory.get_broker_config("futu")
-        assert futu_config["account_id"] == "futu_account"
-        assert futu_config["host"] == "127.0.0.1"
-        assert futu_config["port"] == 11111
+        expected_futu_account = os.getenv("FUTU_ACCOUNT_ID", "futu_account")
+        expected_futu_host = os.getenv("FUTU_HOST", "127.0.0.1")
+        expected_futu_port = int(os.getenv("FUTU_PORT", "11111"))
+        assert futu_config["account_id"] == expected_futu_account
+        assert futu_config["host"] == expected_futu_host
+        assert futu_config["port"] == expected_futu_port

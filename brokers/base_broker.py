@@ -33,7 +33,7 @@ class BaseBroker(ABC):
 
     @abstractmethod
     def _get_broker_type(self) -> str:
-        """返回券商类型: 'xtquant' | 'futu' | 'mock'"""
+        """返回券商类型: 'gjzj' | 'futu' | 'mock'"""
         pass
 
     @abstractmethod
