@@ -119,6 +119,17 @@ class MockAdapter(BaseBroker):
         order_type: OrderType = OrderType.MARKET
     ) -> Dict[str, Any]:
         """买入股票"""
+
+        # 参数验证
+        is_valid, error_msg = self._validate_order_params(symbol, amount, price, order_type)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": error_msg,
+                "symbol": symbol,
+                "amount": amount,
+            }
+
         market = "cn" if symbol.endswith((".SH", ".SZ")) else "us"
 
         # A股必须100的倍数
@@ -196,6 +207,17 @@ class MockAdapter(BaseBroker):
         order_type: OrderType = OrderType.MARKET
     ) -> Dict[str, Any]:
         """卖出股票（保护人工持仓）"""
+
+        # 参数验证
+        is_valid, error_msg = self._validate_order_params(symbol, amount, price, order_type)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": error_msg,
+                "symbol": symbol,
+                "amount": amount,
+            }
+
         market = "cn" if symbol.endswith((".SH", ".SZ")) else "us"
 
         # A股必须100的倍数

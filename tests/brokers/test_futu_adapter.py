@@ -34,6 +34,9 @@ class TestFutuAdapterReal:
         cls.market = os.getenv("FUTU_MARKET", "US")
         cls.security_firm = os.getenv("FUTU_SECURITY_FIRM", "")
 
+        # 根据市场类型选择测试股票代码
+        cls.test_symbol = "AAPL" if cls.market.upper() == "US" else "00700"  # 美股用AAPL，港股用00700（腾讯）
+
         adapter = FutuAdapter.create_from_config()
         project_root = Path(__file__).resolve().parent.parent.parent
         ai_position_file = project_root / "data" / "ai_positions" / "futu_ai_positions.jsonl"
@@ -82,6 +85,7 @@ class TestFutuAdapterReal:
             assert adapter._quote_ctx is not None
 
         # 连接成功后，打印账户余额和持仓信息
+        currency_symbol = "$" if adapter.market.upper() == "US" else "HK$"
         print("\n" + "=" * 60)
         print("🔗 富途证券连接成功")
         print("=" * 60)
@@ -98,8 +102,8 @@ class TestFutuAdapterReal:
                 account_info = adapter._fetch_account_info()
                 print("\n💰 账户余额信息")
                 print("-" * 60)
-                print(f"现金余额: ${account_info.get('cash', 0.0):,.2f}")
-                print(f"总资产: ${account_info.get('total_asset', 0.0):,.2f}")
+                print(f"现金余额: {currency_symbol}{account_info['cash']:,.2f}")
+                print(f"总资产: {currency_symbol}{account_info['total_asset']:,.2f}")
                 print("-" * 60)
 
                 # 获取持仓信息
@@ -114,13 +118,21 @@ class TestFutuAdapterReal:
                 else:
                     print("当前无持仓")
                 print("-" * 60)
+            except RuntimeError as e:
+                print(f"\n⚠️ 警告: 获取账户信息失败: {e}")
+                print("提示: 请检查FutuOpenD是否已登录并启用交易权限")
             except Exception as e:
                 print(f"\n⚠️ 警告: 获取账户信息失败: {e}")
                 import traceback
                 traceback.print_exc()
         else:
             print("\nℹ️  提示: 交易上下文未创建，无法获取账户余额和持仓信息")
-            print("请确保FutuOpenD已登录并启用交易权限")
+            print("=" * 60)
+            print("可能的原因：")
+            print("  1. FutuOpenD未登录或未启用交易权限")
+            print("  2. 市场类型配置错误（当前市场: {})".format(adapter.market))
+            print("  3. 连接测试失败（请查看上方的警告信息）")
+            print("=" * 60)
 
         print("\n" + "=" * 60 + "\n")
 
@@ -130,8 +142,9 @@ class TestFutuAdapterReal:
         if not adapter._connected:
             pytest.skip("无法连接，跳过测试")
 
+        test_symbol = self.__class__.test_symbol
         try:
-            price = adapter.get_price("AAPL")
+            price = adapter.get_price(test_symbol)
             assert isinstance(price, (int, float)) and price > 0
         except ValueError as e:
             pytest.skip(f"无法获取价格数据: {e}")
@@ -165,12 +178,13 @@ class TestFutuAdapterReal:
         assert isinstance(position["total_asset"], (int, float))
 
         # 打印持仓信息
+        currency_symbol = "$" if adapter.market.upper() == "US" else "HK$"
         print("\n" + "=" * 60)
         print("📊 富途证券持仓情况")
         print("=" * 60)
         print(f"账户ID: {adapter.account_id}")
-        print(f"现金余额: ${position['cash']:,.2f}")
-        print(f"总资产: ${position['total_asset']:,.2f}")
+        print(f"现金余额: {currency_symbol}{position['cash']:,.2f}")
+        print(f"总资产: {currency_symbol}{position['total_asset']:,.2f}")
         print("-" * 60)
 
         total_positions = position["total_positions"]
@@ -208,7 +222,7 @@ class TestFutuAdapterReal:
         if not adapter._connected:
             pytest.skip("无法连接，跳过测试")
 
-        test_symbol = "AAPL"
+        test_symbol = self.__class__.test_symbol
         position = adapter.get_position(test_symbol)
         assert isinstance(position, dict) and position["symbol"] == test_symbol
         assert all(key in position for key in ["total_position", "ai_position", "manual_position"])
@@ -224,7 +238,8 @@ class TestFutuAdapterReal:
         if not adapter._connected:
             pytest.skip("无法连接，跳过测试")
 
-        result = adapter.buy("AAPL", 10)
+        test_symbol = self.__class__.test_symbol
+        result = adapter.buy(test_symbol, 10)
         assert isinstance(result, dict) and "success" in result
 
     @pytest.mark.skipif(
@@ -237,11 +252,12 @@ class TestFutuAdapterReal:
         if not adapter._connected:
             pytest.skip("无法连接，跳过测试")
 
-        ai_position = adapter.get_position("AAPL")["ai_position"]
+        test_symbol = self.__class__.test_symbol
+        ai_position = adapter.get_position(test_symbol)["ai_position"]
         if ai_position == 0:
             pytest.skip("当前没有AI持仓，跳过测试")
 
-        result = adapter.sell("AAPL", ai_position + 10)
+        result = adapter.sell(test_symbol, ai_position + 10)
         assert not result["success"] and ("AI持仓不足" in result["error"] or "持仓不足" in result["error"])
 
     def test_fetch_account_info(self):
@@ -250,17 +266,16 @@ class TestFutuAdapterReal:
         if not adapter._connected:
             pytest.skip("无法连接，跳过测试")
 
-        account_info = adapter._fetch_account_info()
-        assert isinstance(account_info, dict) and "cash" in account_info and "total_asset" in account_info
-        assert isinstance(account_info["cash"], (int, float)) and isinstance(account_info["total_asset"], (int, float))
+        if not adapter._trade_ctx:
+            pytest.skip("交易上下文未创建，跳过测试")
 
-        print("\n" + "=" * 60)
-        print("💰 富途证券账户信息")
-        print("=" * 60)
-        print(f"账户ID: {adapter.account_id}")
-        print(f"现金余额: ${account_info['cash']:,.2f}")
-        print(f"总资产: ${account_info['total_asset']:,.2f}")
-        print("=" * 60 + "\n")
+        try:
+            account_info = adapter._fetch_account_info()
+            assert isinstance(account_info, dict) and "cash" in account_info and "total_asset" in account_info
+            assert isinstance(account_info["cash"], (int, float)) and isinstance(account_info["total_asset"], (int, float))
+
+        except RuntimeError as e:
+            pytest.skip(f"无法获取账户信息: {e}")
 
     def test_fetch_total_positions(self):
         """测试获取总持仓"""

@@ -225,6 +225,16 @@ class GjzjAdapter(BaseBroker):
     ) -> Dict[str, Any]:
         """买入股票"""
 
+        # 参数验证
+        is_valid, error_msg = self._validate_order_params(symbol, amount, price, order_type)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": error_msg,
+                "symbol": symbol,
+                "amount": amount,
+            }
+
         # A股必须100的倍数
         if amount % 100 != 0:
             return {
@@ -285,9 +295,17 @@ class GjzjAdapter(BaseBroker):
             )
 
             if order_id > 0:
-                # 查询总持仓
+                # 等待一小段时间，让订单执行
+                import time
+                time.sleep(0.5)
+
+                # 查询实际总持仓（而不是假设）
                 total_positions = self._fetch_total_positions()
-                total_qty = total_positions.get(symbol, 0) + amount  # 假设买入成功
+                total_qty = total_positions.get(symbol, 0)
+
+                # 如果查询到的持仓没有增加，可能是订单还在处理中
+                # 这里我们仍然记录，因为订单已经提交成功
+                # 实际持仓会在后续查询中更新
 
                 # 记录到AI持仓管理器
                 actual_price = price if price else self.get_price(symbol)
@@ -301,12 +319,13 @@ class GjzjAdapter(BaseBroker):
                 return {
                     "success": True,
                     "order_id": str(order_id),
-                    "message": "买入成功",
+                    "message": "买入订单已提交",
                     "symbol": symbol,
                     "amount": amount,
                     "price": actual_price,
                     "ai_position": self.ai_position_manager.get_ai_position(symbol),
                     "total_position": total_qty,
+                    "note": "订单已提交，实际持仓可能稍后更新",
                 }
             else:
                 return {
@@ -336,6 +355,16 @@ class GjzjAdapter(BaseBroker):
         order_type: OrderType = OrderType.MARKET
     ) -> Dict[str, Any]:
         """卖出股票（保护人工持仓）"""
+
+        # 参数验证
+        is_valid, error_msg = self._validate_order_params(symbol, amount, price, order_type)
+        if not is_valid:
+            return {
+                "success": False,
+                "error": error_msg,
+                "symbol": symbol,
+                "amount": amount,
+            }
 
         # A股必须100的倍数
         if amount % 100 != 0:
@@ -416,8 +445,15 @@ class GjzjAdapter(BaseBroker):
             )
 
             if order_id > 0:
+                # 等待一小段时间，让订单执行
+                import time
+                time.sleep(0.5)
+
+                # 查询实际总持仓（而不是假设）
+                new_total_positions = self._fetch_total_positions()
+                new_total_qty = new_total_positions.get(symbol, 0)
+
                 # 更新AI持仓管理器
-                new_total_qty = max(0, total_qty - amount)
                 actual_price = price if price else self.get_price(symbol)
                 self.ai_position_manager.record_sell(
                     symbol=symbol,
@@ -429,12 +465,13 @@ class GjzjAdapter(BaseBroker):
                 return {
                     "success": True,
                     "order_id": str(order_id),
-                    "message": f"卖出成功，AI持仓剩余: {ai_qty - amount}",
+                    "message": f"卖出订单已提交，AI持仓剩余: {ai_qty - amount}",
                     "symbol": symbol,
                     "amount": amount,
                     "price": actual_price,
                     "ai_position": ai_qty - amount,
                     "total_position": new_total_qty,
+                    "note": "订单已提交，实际持仓可能稍后更新",
                 }
             else:
                 return {

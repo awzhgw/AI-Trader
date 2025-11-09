@@ -264,14 +264,7 @@ class TestGjzjAdapterReal:
         assert isinstance(account_info["cash"], (int, float))
         assert isinstance(account_info["total_asset"], (int, float))
 
-        # 打印账户余额信息
-        print("\n" + "=" * 60)
-        print("📊 国金证券账户信息")
-        print("=" * 60)
-        print(f"账户ID: {adapter.account_id}")
-        print(f"现金余额: ¥{account_info['cash']:,.2f}")
-        print(f"总资产: ¥{account_info['total_asset']:,.2f}")
-        print("=" * 60 + "\n")
+
 
     def test_fetch_total_positions(self):
         """测试获取总持仓"""
