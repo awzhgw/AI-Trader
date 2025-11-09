@@ -7,8 +7,17 @@
     或者
     pytest tests/brokers/ -v
 """
-import sys
+# 必须在导入任何其他模块之前设置警告过滤
+# 这些警告来自富途库内部使用的已弃用protobuf API，在模块导入时就会产生
 import os
+# 设置环境变量，全局过滤DeprecationWarning警告
+os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.simplefilter("ignore", DeprecationWarning)
+
+import sys
 from pathlib import Path
 
 # 添加项目根目录到Python路径
@@ -34,6 +43,7 @@ if __name__ == "__main__":
         "--tb=short",  # 简短的traceback
         "-s",  # 显示print输出
         "--color=yes",  # 彩色输出
+        "-W", "ignore::DeprecationWarning",  # 忽略DeprecationWarning警告
     ])
 
     print("=" * 60)

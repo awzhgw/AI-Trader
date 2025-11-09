@@ -2,6 +2,12 @@
 pytest 配置文件
 用于配置测试环境和标记
 """
+# 必须在导入任何其他模块之前设置警告过滤
+# 这些警告来自富途库内部使用的已弃用protobuf API，在模块导入时就会产生
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.simplefilter("ignore", DeprecationWarning)
+
 import os
 import pytest
 from dotenv import load_dotenv
@@ -13,13 +19,20 @@ load_dotenv(env_path)
 
 
 def pytest_configure(config):
-    """配置 pytest 标记"""
+    """配置 pytest 标记和警告过滤"""
+    # 配置 pytest 标记
     config.addinivalue_line(
         "markers", "real_connection: 标记需要真实连接的测试"
     )
     config.addinivalue_line(
         "markers", "skip_trade: 标记跳过买卖操作的测试"
     )
+
+    # 在 pytest 配置中也设置警告过滤
+    config.option.disable_warnings = True
+    # 添加警告过滤到 pytest 配置
+    import warnings
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def pytest_collection_modifyitems(config, items):
