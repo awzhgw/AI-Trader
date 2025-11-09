@@ -21,14 +21,28 @@ class TestAIPositionManager:
         self.test_broker_type = "test_broker"
         self.test_account_id = "test_account"
 
-        # 设置环境变量，让AIPositionManager使用临时目录
-        self.original_project_root = None
+        # 清理可能存在的测试文件，确保测试隔离
+        self._cleanup_test_files()
 
     def teardown_method(self):
         """每个测试方法后执行"""
+        # 清理测试文件
+        self._cleanup_test_files()
+
         # 清理临时目录
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
+
+    def _cleanup_test_files(self):
+        """清理测试文件"""
+        # 获取测试文件路径
+        project_root = Path(__file__).resolve().parent.parent.parent
+        position_dir = project_root / "data" / "ai_positions"
+        test_file = position_dir / f"{self.test_broker_type}_ai_positions.jsonl"
+
+        # 删除测试文件（如果存在）
+        if test_file.exists():
+            test_file.unlink()
 
     def test_init(self):
         """测试初始化"""

@@ -136,7 +136,7 @@ class AlphaVantageNewsTool:
             response.raise_for_status()
 
             json_data = response.json()
-            
+
             # Check for API errors
             if "Error Message" in json_data:
                 raise Exception(f"Alpha Vantage API error: {json_data['Error Message']}")
@@ -145,7 +145,7 @@ class AlphaVantageNewsTool:
 
             # Extract feed data
             feed = json_data.get("feed", [])
-            
+
             if not feed:
                 print(f"⚠️ Alpha Vantage API returned empty feed")
                 return []
@@ -182,7 +182,7 @@ class AlphaVantageNewsTool:
         today_date = get_config_value("TODAY_DATE")
         time_from = None
         time_to = None
-        
+
         if today_date:
             # Convert TODAY_DATE to Alpha Vantage API format (YYYYMMDDTHHMM)
             # TODAY_DATE format is "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
@@ -231,7 +231,7 @@ def get_market_news(
 
     Args:
         query: Search query description (used for logging purposes)
-        tickers: Optional. Stock/crypto/forex symbols to filter by. 
+        tickers: Optional. Stock/crypto/forex symbols to filter by.
                 Examples: "AAPL" or "COIN,CRYPTO:BTC,FOREX:USD"
         topics: Optional. News topics to filter by.
                 Examples: "technology" or "technology,ipo"
@@ -262,11 +262,11 @@ def get_market_news(
             summary = article.get("summary", "N/A")
             time_published = article.get("time_published", "unknown")
             source = article.get("source", "N/A")
-            
+
             # Format sentiment information
             overall_sentiment = article.get("overall_sentiment_score", "N/A")
             sentiment_label = article.get("overall_sentiment_label", "N/A")
-            
+
             # Format ticker sentiment
             ticker_sentiment_str = "N/A"
             ticker_sentiment = article.get("ticker_sentiment", [])
@@ -281,7 +281,7 @@ def get_market_news(
                         f"{ticker}: relevance={relevance}, sentiment={sentiment_score} ({sentiment_label_ticker})"
                     )
                 ticker_sentiment_str = "; ".join(ticker_parts)
-            
+
             # Format topics
             topics_str = "N/A"
             topics_list = article.get("topics", [])

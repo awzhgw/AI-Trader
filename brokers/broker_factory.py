@@ -34,7 +34,7 @@ class BrokerAdapterFactory:
 
         Args:
             symbol: 股票代码（用于自动识别市场）
-            broker_mode: 券商模式 ("mock" | "xtquant" | "futu" | "auto")
+            broker_mode: 券商模式 ("mock" | "gjzj" | "futu" | "auto")
 
         Returns:
             BaseBroker 实例
@@ -50,7 +50,7 @@ class BrokerAdapterFactory:
             if symbol:
                 market = BrokerAdapterFactory.detect_market(symbol)
                 if market == "cn":
-                    broker_mode = "xtquant"
+                    broker_mode = "gjzj"
                 else:
                     broker_mode = "futu"
             else:
@@ -62,9 +62,9 @@ class BrokerAdapterFactory:
             from brokers.mock.mock_adapter import MockAdapter
             return MockAdapter.create_from_config()
 
-        elif broker_mode == "xtquant":
-            from brokers.xtquant.xtquant_adapter import XtQuantAdapter
-            return XtQuantAdapter.create_from_config()
+        elif broker_mode == "gjzj":
+            from brokers.gjzj.gjzj_adapter import GjzjAdapter
+            return GjzjAdapter.create_from_config()
 
         elif broker_mode == "futu":
             from brokers.futu.futu_adapter import FutuAdapter
@@ -77,20 +77,49 @@ class BrokerAdapterFactory:
     def get_broker_config(broker_type: str) -> Dict[str, Any]:
         """
         获取券商配置
+        所有配置项都从 .env 文件中的环境变量读取
 
         Args:
-            broker_type: 券商类型
+            broker_type: 券商类型 ("mock" | "gjzj" | "futu")
 
         Returns:
             配置字典
+
+        配置项说明：
+        - Mock适配器:
+          - SIGNATURE: 账户标识（默认: "default"）
+          - TODAY_DATE: 交易日期（可选，默认: 当前日期）
+          - LOG_PATH: 日志路径（默认: "./data/agent_data"）
+
+        - Gjzj适配器:
+          - GJZJ_ACCOUNT_ID: 账户ID（默认: "default"）
+          - GJZJ_SESSION_ID: 会话ID，0表示默认会话（默认: "0"）
+          - GJZJ_STRATEGY_NAME: 策略名称（默认: "AI-Trader"）
+          - GJZJ_PATH: MiniQMT客户端userdata_mini的完整路径（必需）
+
+        - Futu适配器:
+          - FUTU_ACCOUNT_ID: 账户ID（默认: "default"）
+          - FUTU_HOST: Futu API主机地址（默认: "127.0.0.1"）
+          - FUTU_PORT: Futu API端口（默认: "11111"）
+          - FUTU_MARKET: 市场类型（默认: "US"）
+          - FUTU_SECURITY_FIRM: 券商名称（默认: ""）
+          - FUTU_REAL_TRADE: 是否真实交易，"true"或"false"（默认: "false"）
         """
         config = {
             "account_id": get_config_value(f"{broker_type.upper()}_ACCOUNT_ID", "default")
         }
 
-        if broker_type == "xtquant":
+        if broker_type == "mock":
+            # Mock适配器使用SIGNATURE作为account_id
             config.update({
-                "session_id": int(get_config_value("XTQUANT_SESSION_ID", "0")),  # 会话ID，0表示默认会话
+                "account_id": get_config_value("SIGNATURE", "default"),
+            })
+        elif broker_type == "gjzj":
+            config.update({
+                "account_id": get_config_value("GJZJ_ACCOUNT_ID", "default"),
+                "session_id": int(get_config_value("GJZJ_SESSION_ID", "0")),  # 会话ID，0表示默认会话
+                "strategy_name": get_config_value("GJZJ_STRATEGY_NAME", "AI-Trader"),  # 策略名称
+                "path": get_config_value("GJZJ_PATH", None),  # MiniQMT客户端userdata_mini路径
                 # trader实例需要在运行时创建，不能从环境变量获取
             })
         elif broker_type == "futu":

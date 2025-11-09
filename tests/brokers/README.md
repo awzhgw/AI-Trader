@@ -12,7 +12,7 @@ pytest tests/brokers/ -v
 pytest tests/brokers/test_ai_position_manager.py -v
 pytest tests/brokers/test_mock_adapter.py -v
 pytest tests/brokers/test_broker_factory.py -v
-pytest tests/brokers/test_xtquant_adapter.py -v
+pytest tests/brokers/test_gjzj_adapter.py -v
 pytest tests/brokers/test_futu_adapter.py -v
 
 # 运行特定测试类
@@ -52,7 +52,7 @@ python tests/brokers/run_tests.py
 - ✅ 自动模式创建适配器
 - ✅ 获取券商配置
 
-### test_xtquant_adapter.py
+### test_gjzj_adapter.py
 - ✅ 初始化
 - ✅ 连接成功/失败
 - ✅ 获取价格

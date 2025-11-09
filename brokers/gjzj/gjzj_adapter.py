@@ -9,29 +9,32 @@ from brokers.base_broker import BaseBroker, OrderType
 from tools.general_tools import get_config_value
 
 
-class XtQuantAdapter(BaseBroker):
-    """XtQuant适配器（A股）"""
+class GjzjAdapter(BaseBroker):
+    """Gjzj适配器（A股）"""
 
     def __init__(self, config: Dict[str, Any]):
         """
         Args:
-            config: 配置字典，包含 account_id, session_id 等
+            config: 配置字典，包含 account_id, session_id, strategy_name, path 等
         """
         super().__init__(config)
-        self.account_id = config.get("account_id", "default")
+        # account_id已经在BaseBroker中设置，这里不需要再设置
+        # 但如果config中有account_id，BaseBroker会使用它
         self.session_id = config.get("session_id", 0)  # 会话ID
+        self.strategy_name = config.get("strategy_name", "AI-Trader")  # 策略名称
+        self.path = config.get("path", None)  # MiniQMT客户端userdata_mini路径
         self.trader = config.get("trader", None)  # XtQuantTrader实例
         self._connected = False
 
     @classmethod
-    def create_from_config(cls) -> 'XtQuantAdapter':
+    def create_from_config(cls) -> 'GjzjAdapter':
         """从环境变量创建适配器"""
         from brokers.broker_factory import BrokerAdapterFactory
-        config = BrokerAdapterFactory.get_broker_config("xtquant")
+        config = BrokerAdapterFactory.get_broker_config("gjzj")
         return cls(config)
 
     def _get_broker_type(self) -> str:
-        return "xtquant"
+        return "gjzj"
 
     def connect(self) -> bool:
         """
@@ -52,27 +55,33 @@ class XtQuantAdapter(BaseBroker):
 
                 # 创建XtQuantTrader实例
                 if self.trader is None:
+                    # 检查path配置
+                    if self.path is None:
+                        print("⚠️ 警告: 未配置XtQuant path参数")
+                        print("请设置config['path']为MiniQMT客户端userdata_mini的完整路径")
+                        print("例如: config['path'] = 'D:\\\\迅投极速交易终端 睿智融科版\\\\userdata_mini'")
+                        return False
+
                     # 创建API实例
-                    self.trader = xttrader.XtQuantTrader()
+                    # XtQuantTrader(path, session_id, callback=None)
+                    self.trader = xttrader.XtQuantTrader(self.path, self.session_id)
 
                     # 注册回调类（可选）
                     # callback = MyXtQuantTraderCallback()
                     # self.trader.register_callback(callback)
 
-                    # 准备API环境
-                    self.trader.prepare()
+                    # 启动交易线程
+                    self.trader.start()
 
                     # 创建连接
-                    # 参数: session_id, account_type
-                    # session_id: 会话ID，0表示使用默认会话
-                    # account_type: 账号类型，StockAccount.STOCK_ACCOUNT表示股票账号
-                    self.session_id = self.trader.start(session_id=self.session_id)
+                    # connect()返回0表示连接成功
+                    connect_result = self.trader.connect()
 
-                    if self.session_id > 0:
+                    if connect_result == 0:
                         self._connected = True
                         return True
                     else:
-                        print(f"XtQuant连接失败: session_id={self.session_id}")
+                        print(f"XtQuant连接失败: connect_result={connect_result}")
                         return False
                 else:
                     self._connected = True
@@ -125,13 +134,11 @@ class XtQuantAdapter(BaseBroker):
         try:
             if self.trader is not None and self._connected:
                 # XtQuant API: query_stock_positions
-                # 参数: account_id, account_type
+                # 参数: account (StockAccount对象)
                 from xtquant.xttype import StockAccount
 
-                positions = self.trader.query_stock_positions(
-                    account_id=self.account_id,
-                    account_type=StockAccount.STOCK_ACCOUNT
-                )
+                account = StockAccount(self.account_id, 'STOCK')
+                positions = self.trader.query_stock_positions(account)
 
                 if positions:
                     result = {}
@@ -143,6 +150,9 @@ class XtQuantAdapter(BaseBroker):
                         if volume > 0:
                             result[stock_code] = volume
                     return result
+                else:
+                    # positions为None或空列表时返回空字典
+                    return {}
             else:
                 print("⚠️ 警告: XtQuant未连接，无法获取真实持仓")
                 return {}
@@ -160,13 +170,11 @@ class XtQuantAdapter(BaseBroker):
         try:
             if self.trader is not None and self._connected:
                 # XtQuant API: query_stock_asset
-                # 参数: account_id, account_type
+                # 参数: account (StockAccount对象)
                 from xtquant.xttype import StockAccount
 
-                asset = self.trader.query_stock_asset(
-                    account_id=self.account_id,
-                    account_type=StockAccount.STOCK_ACCOUNT
-                )
+                account = StockAccount(self.account_id, 'STOCK')
+                asset = self.trader.query_stock_asset(account)
 
                 if asset:
                     # asset是XtAsset对象
@@ -223,27 +231,29 @@ class XtQuantAdapter(BaseBroker):
             from xtquant.xttype import StockAccount
 
             # XtQuant API: order_stock
-            # 参数: account_id, account_type, order_type, stock_code, order_volume, price_type, price, strategy_name, order_remark
-            # order_type: 委托类型，1=买入，2=卖出
+            # 参数: account, stock_code, order_type, order_volume, price_type, price, strategy_name, order_remark
+            # account: StockAccount对象（包含account_id和account_type）
+            # order_type: 委托类型，23=买入，24=卖出
             # price_type: 报价类型，0=限价，4=市价
 
-            order_type_code = 1  # 买入
+            # 创建StockAccount对象
+            account = StockAccount(self.account_id, 'STOCK')
+
+            order_type_code = 23  # 买入（23=买，24=卖）
             price_type = 0 if order_type == OrderType.LIMIT else 4  # 0=限价，4=市价
             order_price = price if order_type == OrderType.LIMIT else 0.0
 
-            strategy_name = get_config_value("XTQUANT_STRATEGY_NAME", "AI-Trader")
             order_remark = f"XtQuant买入 {symbol} {amount}股"
 
             # 同步下单
             order_id = self.trader.order_stock(
-                account_id=self.account_id,
-                account_type=StockAccount.STOCK_ACCOUNT,
-                order_type=order_type_code,
+                account=account,
                 stock_code=symbol,
+                order_type=order_type_code,
                 order_volume=amount,
                 price_type=price_type,
                 price=order_price,
-                strategy_name=strategy_name,
+                strategy_name=self.strategy_name,
                 order_remark=order_remark
             )
 
@@ -353,23 +363,28 @@ class XtQuantAdapter(BaseBroker):
             from xtquant.xttype import StockAccount
 
             # XtQuant API: order_stock
-            order_type_code = 2  # 卖出
+            # 参数: account, stock_code, order_type, order_volume, price_type, price, strategy_name, order_remark
+            # account: StockAccount对象（包含account_id和account_type）
+            # order_type: 委托类型，23=买入，24=卖出
+
+            # 创建StockAccount对象
+            account = StockAccount(self.account_id, 'STOCK')
+
+            order_type_code = 24  # 卖出（23=买，24=卖）
             price_type = 0 if order_type == OrderType.LIMIT else 4  # 0=限价，4=市价
             order_price = price if order_type == OrderType.LIMIT else 0.0
 
-            strategy_name = get_config_value("XTQUANT_STRATEGY_NAME", "AI-Trader")
             order_remark = f"XtQuant卖出 {symbol} {amount}股"
 
             # 同步下单
             order_id = self.trader.order_stock(
-                account_id=self.account_id,
-                account_type=StockAccount.STOCK_ACCOUNT,
-                order_type=order_type_code,
+                account=account,
                 stock_code=symbol,
+                order_type=order_type_code,
                 order_volume=amount,
                 price_type=price_type,
                 price=order_price,
-                strategy_name=strategy_name,
+                strategy_name=self.strategy_name,
                 order_remark=order_remark
             )
 

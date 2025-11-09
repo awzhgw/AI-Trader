@@ -1,8 +1,8 @@
-# XtQuant适配器使用说明
+# Gjzj适配器使用说明
 
 ## 概述
 
-XtQuant适配器基于迅投XtQuant交易模块，用于A股量化交易。XtQuant提供了完整的交易API，支持同步和异步下单、查询持仓、查询资产等功能。
+Gjzj适配器基于迅投XtQuant交易模块，用于A股量化交易。XtQuant提供了完整的交易API，支持同步和异步下单、查询持仓、查询资产等功能。
 
 **参考文档**: https://dict.thinktrader.net/nativeApi/xttrader.html
 
@@ -17,11 +17,11 @@ pip install xtquant
 ### 基本使用
 
 ```python
-from brokers.xtquant.xtquant_adapter import XtQuantAdapter
+from brokers.gjzj.gjzj_adapter import GjzjAdapter
 from brokers.broker_factory import BrokerAdapterFactory
 
 # 创建适配器
-broker = BrokerAdapterFactory.create_broker(broker_mode="xtquant")
+broker = BrokerAdapterFactory.create_broker(broker_mode="gjzj")
 
 # 连接（必需）
 if broker.connect():
@@ -58,11 +58,11 @@ import os
 from brokers.broker_factory import BrokerAdapterFactory
 
 # 设置环境变量
-os.environ["XTQUANT_ACCOUNT_ID"] = "your_account_id"
-os.environ["XTQUANT_SESSION_ID"] = "0"
+os.environ["GJZJ_ACCOUNT_ID"] = "your_account_id"
+os.environ["GJZJ_SESSION_ID"] = "0"
 
 # 创建适配器
-broker = BrokerAdapterFactory.create_broker(broker_mode="xtquant")
+broker = BrokerAdapterFactory.create_broker(broker_mode="gjzj")
 
 # 连接并交易
 broker.connect()
@@ -74,9 +74,9 @@ result = broker.buy("600519.SH", 100)
 ### 环境变量
 
 ```bash
-# XtQuant配置
-XTQUANT_ACCOUNT_ID=your_account_id
-XTQUANT_SESSION_ID=0  # 会话ID，0表示默认会话
+# Gjzj配置
+GJZJ_ACCOUNT_ID=your_account_id
+GJZJ_SESSION_ID=0  # 会话ID，0表示默认会话
 ```
 
 ### 配置字典
@@ -97,7 +97,7 @@ config = {
 broker.connect() -> bool
 ```
 
-建立与XtQuant交易系统的连接。必须在交易前调用。
+建立与XtQuant交易系统的连接（通过Gjzj适配器）。必须在交易前调用。
 
 ### 买入
 
@@ -134,7 +134,7 @@ broker.get_position(symbol: Optional[str] = None) -> Dict
 
 ## 保护人工持仓
 
-XtQuant适配器会自动保护人工持仓：
+Gjzj适配器会自动保护人工持仓：
 
 - ✅ AI只能卖出自己买入的股票
 - ✅ 卖出前会检查AI持仓是否足够
@@ -161,7 +161,7 @@ pip install xtquant
 
 **解决方案**：确保在交易前调用了`connect()`方法
 ```python
-broker = XtQuantAdapter(config)
+broker = GjzjAdapter(config)
 broker.connect()  # 必需！
 result = broker.buy("600519.SH", 100)
 ```
