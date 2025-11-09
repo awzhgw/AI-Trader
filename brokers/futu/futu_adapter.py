@@ -224,15 +224,48 @@ class FutuAdapter(BaseBroker):
                 ret, data = self._quote_ctx.get_market_snapshot([futu_symbol])
 
                 if ret == RET_OK and data is not None and len(data) > 0:
-                    # 尝试提取价格
-                    for price_field in ['last_price', 'cur_price', 'close_price']:
+                    # 尝试提取价格，按优先级顺序尝试多个字段
+                    # 富途API可能返回的字段：last_price, cur_price, close_price, price, now_price等
+                    price_fields = [
+                        'last_price',      # 最新价
+                        'cur_price',       # 当前价
+                        'now_price',       # 现价
+                        'price',           # 价格
+                        'close_price',     # 收盘价
+                        'prev_close_price', # 昨收价
+                        'open_price',      # 开盘价
+                    ]
+
+                    for price_field in price_fields:
                         if price_field in data.columns:
-                            price = float(data[price_field].iloc[0])
-                            if price > 0:
-                                return price
-                    print(f"⚠️ 警告: 富途API返回数据中没有找到价格字段，可用字段: {list(data.columns)}")
+                            try:
+                                price_value = data[price_field].iloc[0]
+                                # 处理NaN或None值
+                                import math
+                                if price_value is not None:
+                                    # 检查是否为NaN
+                                    if isinstance(price_value, float) and math.isnan(price_value):
+                                        continue
+                                    price = float(price_value)
+                                    if price > 0:
+                                        return price
+                            except (ValueError, TypeError, IndexError):
+                                continue
+
+                    # 如果所有字段都失败，打印调试信息
+                    available_columns = list(data.columns) if hasattr(data, 'columns') else []
+                    print(f"⚠️ 警告: 富途API返回数据中没有找到有效的价格字段")
+                    print(f"   股票代码: {futu_symbol}")
+                    print(f"   可用字段: {available_columns}")
+                    if len(data) > 0:
+                        print(f"   第一行数据: {data.iloc[0].to_dict() if hasattr(data.iloc[0], 'to_dict') else str(data.iloc[0])}")
+                else:
+                    error_msg = data if isinstance(data, str) else "未知错误"
+                    print(f"⚠️ 警告: 富途API获取价格失败，返回码: {ret}, 错误: {error_msg}")
             except Exception as e:
                 print(f"⚠️ 警告: 使用富途API获取价格失败: {e}")
+                import traceback
+                traceback.print_exc()
 
         # 回退到本地数据
         from tools.price_tools import get_open_prices
