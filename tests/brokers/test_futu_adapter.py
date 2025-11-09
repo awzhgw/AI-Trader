@@ -84,16 +84,7 @@ class TestFutuAdapterReal:
         if hasattr(adapter, '_quote_ctx') and adapter._quote_ctx:
             assert adapter._quote_ctx is not None
 
-        # 连接成功后，打印账户余额和持仓信息
         currency_symbol = "$" if adapter.market.upper() == "US" else "HK$"
-        print("\n" + "=" * 60)
-        print("🔗 富途证券连接成功")
-        print("=" * 60)
-        print(f"账户ID: {adapter.account_id}")
-        print(f"市场: {adapter.market}")
-        print(f"主机: {adapter.host}:{adapter.port}")
-        print(f"交易上下文: {'已创建' if adapter._trade_ctx else '未创建'}")
-        print("=" * 60)
 
         # 如果交易上下文已创建，获取并打印账户余额和持仓
         if adapter._trade_ctx:
