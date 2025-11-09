@@ -1,0 +1,1 @@
+nohup \cp -r * /mnt/d/deepstock/AI-Trader/  > /dev/null 2>&1 &
