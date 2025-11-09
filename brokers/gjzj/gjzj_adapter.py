@@ -3,6 +3,7 @@ XtQuant适配器（A股）
 基于迅投XtQuant交易模块
 参考文档: https://dict.thinktrader.net/nativeApi/xttrader.html
 """
+import os
 from typing import Dict, Optional, Any, List
 
 from brokers.base_broker import BaseBroker, OrderType
@@ -66,8 +67,11 @@ class GjzjAdapter(BaseBroker):
                     # 检查path配置
                     if self.path is None:
                         print("⚠️ 警告: 未配置XtQuant path参数")
-                        print("请设置config['path']为MiniQMT客户端userdata_mini的完整路径")
-                        print("例如: config['path'] = 'D:\\\\迅投极速交易终端 睿智融科版\\\\userdata_mini'")
+                        return False
+
+                    # 检查路径是否存在
+                    if not os.path.exists(self.path):
+                        print(f"⚠️ 警告: 指定的路径不存在: {self.path}")
                         return False
 
                     # 创建API实例

@@ -18,32 +18,50 @@ from brokers.broker_factory import BrokerAdapterFactory
 class TestGjzjAdapterReal:
     """GjzjAdapter真实连接测试类"""
 
-    @pytest.fixture(autouse=True)
-    def setup_and_teardown(self):
-        """每个测试方法前后执行"""
+    @pytest.fixture(scope="class", autouse=True)
+    def setup_and_teardown(self, request):
+        """类级别的setup和teardown，只连接一次"""
         # 从 .env 读取配置
-        self.account_id = os.getenv("GJZJ_ACCOUNT_ID", "default")
-        self.session_id = int(os.getenv("GJZJ_SESSION_ID", "0"))
-        self.gjzj_path = os.getenv("GJZJ_PATH")
+        cls = request.cls
+        cls.account_id = os.getenv("GJZJ_ACCOUNT_ID", "default")
+        cls.session_id = int(os.getenv("GJZJ_SESSION_ID", "0"))
+        cls.gjzj_path = os.getenv("GJZJ_PATH")
 
-        if not self.gjzj_path:
+        if not cls.gjzj_path:
             pytest.skip("GJZJ_PATH 未配置，跳过真实连接测试")
 
         # 创建适配器
-        self.adapter = GjzjAdapter.create_from_config()
+        adapter = GjzjAdapter.create_from_config()
 
         # 清理测试文件
-        self._cleanup_test_files()
+        project_root = Path(__file__).resolve().parent.parent.parent
+        position_dir = project_root / "data" / "ai_positions"
+        ai_position_file = position_dir / "gjzj_ai_positions.jsonl"
+        if ai_position_file.exists():
+            ai_position_file.unlink()
+
+        # 连接一次（在第一个测试前）
+        import platform
+        if platform.system() == 'Windows':
+            # 只在Windows环境下尝试连接
+            adapter.connect()
+
+        # 将适配器设置到类上，供所有测试方法使用
+        cls.adapter = adapter
 
         yield
 
-        # 测试后清理
-        self._cleanup_test_files()
+        # 所有测试结束后清理
+        project_root = Path(__file__).resolve().parent.parent.parent
+        position_dir = project_root / "data" / "ai_positions"
+        ai_position_file = position_dir / "gjzj_ai_positions.jsonl"
+        if ai_position_file.exists():
+            ai_position_file.unlink()
         # 断开连接
-        if hasattr(self.adapter, '_connected') and self.adapter._connected:
+        if hasattr(adapter, '_connected') and adapter._connected:
             try:
-                if self.adapter.trader:
-                    self.adapter.trader.stop()
+                if adapter.trader:
+                    adapter.trader.stop()
             except:
                 pass
 
@@ -57,13 +75,14 @@ class TestGjzjAdapterReal:
 
     def test_init(self):
         """测试初始化"""
-        assert self.adapter.broker_type == "gjzj"
-        assert self.adapter.account_id == self.account_id
-        assert self.adapter.session_id == self.session_id
-        assert self.adapter.path == self.gjzj_path
+        adapter = self.__class__.adapter
+        assert adapter.broker_type == "gjzj"
+        assert adapter.account_id == self.__class__.account_id
+        assert adapter.session_id == self.__class__.session_id
+        assert adapter.path == self.__class__.gjzj_path
 
     def test_connect(self):
-        """测试真实连接"""
+        """测试真实连接（连接已在setup中完成，这里只验证连接状态）"""
         import platform
 
         # 检查运行环境
@@ -74,28 +93,25 @@ class TestGjzjAdapterReal:
                 "建议在Windows环境中运行此测试，或使用模拟交易模式。"
             )
 
-        result = self.adapter.connect()
-
-        # 连接可能成功或失败，取决于实际环境
-        # 如果连接失败，打印错误信息但不失败测试
-        if not result:
+        adapter = self.__class__.adapter
+        # 连接已在setup中完成，这里只验证连接状态
+        # 如果连接失败，跳过测试
+        if not adapter._connected:
             pytest.skip(f"无法连接到国金证券，请检查配置和网络连接")
 
-        assert result is True
-        assert self.adapter._connected is True
-        assert self.adapter.trader is not None
+        assert adapter._connected is True
+        assert adapter.trader is not None
 
     def test_get_price(self):
         """测试获取价格（使用本地数据）"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
         # 测试获取A股价格（使用本地数据）
         try:
-            price = self.adapter.get_price("600519.SH")
+            price = adapter.get_price("600519.SH")
             assert isinstance(price, (int, float))
             assert price > 0
         except ValueError as e:
@@ -104,14 +120,13 @@ class TestGjzjAdapterReal:
 
     def test_get_position(self):
         """测试获取持仓信息并打印账户余额"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
         # 获取持仓
-        position = self.adapter.get_position()
+        position = adapter.get_position()
 
         assert isinstance(position, dict)
         assert "total_positions" in position
@@ -131,7 +146,7 @@ class TestGjzjAdapterReal:
         print("\n" + "=" * 60)
         print("📊 国金证券账户余额和持仓信息")
         print("=" * 60)
-        print(f"账户ID: {self.adapter.account_id}")
+        print(f"账户ID: {adapter.account_id}")
         print(f"现金余额: ¥{position['cash']:,.2f}")
         print(f"总资产: ¥{position['total_asset']:,.2f}")
         print(f"\n总持仓数量: {len(position['total_positions'])} 只股票")
@@ -149,15 +164,14 @@ class TestGjzjAdapterReal:
 
     def test_get_position_by_symbol(self):
         """测试获取指定股票的持仓"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
         # 测试获取指定股票持仓
         test_symbol = "600519.SH"
-        position = self.adapter.get_position(test_symbol)
+        position = adapter.get_position(test_symbol)
 
         assert isinstance(position, dict)
         assert position["symbol"] == test_symbol
@@ -171,14 +185,13 @@ class TestGjzjAdapterReal:
 
     def test_buy_validation(self):
         """测试买入验证（不实际买入）"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
         # 测试A股必须100的倍数
-        result = self.adapter.buy("600519.SH", 50)  # 不是100的倍数
+        result = adapter.buy("600519.SH", 50)  # 不是100的倍数
         assert result["success"] is False
         assert "multiples of 100" in result["error"].lower() or "100的倍数" in result["error"]
 
@@ -203,14 +216,13 @@ class TestGjzjAdapterReal:
     )
     def test_sell_validation(self):
         """测试卖出验证（不实际卖出）"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
         # 测试A股必须100的倍数
-        result = self.adapter.sell("600519.SH", 50)  # 不是100的倍数
+        result = adapter.sell("600519.SH", 50)  # 不是100的倍数
         assert result["success"] is False
         assert "multiples of 100" in result["error"].lower() or "100的倍数" in result["error"]
 
@@ -220,19 +232,18 @@ class TestGjzjAdapterReal:
     )
     def test_sell_protect_manual_position(self):
         """测试卖出保护人工持仓（不实际卖出）"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
         # 获取当前持仓
-        position = self.adapter.get_position("600519.SH")
+        position = adapter.get_position("600519.SH")
         ai_position = position["ai_position"]
 
         # 尝试卖出超过AI持仓的数量
         if ai_position > 0:
-            result = self.adapter.sell("600519.SH", ai_position + 100)
+            result = adapter.sell("600519.SH", ai_position + 100)
             assert result["success"] is False
             assert "AI持仓不足" in result["error"] or "持仓不足" in result["error"]
         else:
@@ -240,13 +251,12 @@ class TestGjzjAdapterReal:
 
     def test_fetch_account_info(self):
         """测试获取账户信息并打印账户余额"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
-        account_info = self.adapter._fetch_account_info()
+        account_info = adapter._fetch_account_info()
 
         assert isinstance(account_info, dict)
         assert "cash" in account_info
@@ -258,20 +268,19 @@ class TestGjzjAdapterReal:
         print("\n" + "=" * 60)
         print("📊 国金证券账户信息")
         print("=" * 60)
-        print(f"账户ID: {self.adapter.account_id}")
+        print(f"账户ID: {adapter.account_id}")
         print(f"现金余额: ¥{account_info['cash']:,.2f}")
         print(f"总资产: ¥{account_info['total_asset']:,.2f}")
         print("=" * 60 + "\n")
 
     def test_fetch_total_positions(self):
         """测试获取总持仓"""
-        # 确保已连接
-        if not self.adapter._connected:
-            self.adapter.connect()
-            if not self.adapter._connected:
-                pytest.skip("无法连接，跳过测试")
+        adapter = self.__class__.adapter
+        # 如果未连接，跳过测试
+        if not adapter._connected:
+            pytest.skip("无法连接，跳过测试")
 
-        positions = self.adapter._fetch_total_positions()
+        positions = adapter._fetch_total_positions()
 
         assert isinstance(positions, dict)
         # 验证持仓数据格式
