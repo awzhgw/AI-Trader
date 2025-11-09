@@ -131,6 +131,30 @@ class BaseBroker(ABC):
         """
         return self.ai_position_manager.can_sell(symbol, amount)
 
+    def _validate_order_params(self, symbol: str, amount: int, price: Optional[float] = None, order_type: OrderType = OrderType.MARKET) -> Tuple[bool, Optional[str]]:
+        """
+        验证订单参数
+
+        Args:
+            symbol: 股票代码
+            amount: 数量
+            price: 价格（限价单时必需）
+            order_type: 订单类型
+
+        Returns:
+            (是否有效, 错误信息)
+        """
+        if not symbol or not isinstance(symbol, str):
+            return False, "股票代码不能为空"
+
+        if amount <= 0:
+            return False, f"交易数量必须大于0，当前: {amount}"
+
+        if order_type == OrderType.LIMIT and (price is None or price <= 0):
+            return False, "限价单必须提供有效的价格"
+
+        return True, None
+
     @abstractmethod
     def get_price(self, symbol: str) -> float:
         """
