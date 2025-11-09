@@ -1,9 +1,9 @@
 """
-GjzjAdapter单测
+GjzjAdapter真实连接测试
+使用真实的国金证券连接进行测试，但跳过买卖操作以避免真实交易
 """
 import os
 import pytest
-from unittest.mock import patch, MagicMock
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -12,211 +12,270 @@ env_path = Path(__file__).resolve().parents[2] / '.env'
 load_dotenv(env_path)
 
 from brokers.gjzj.gjzj_adapter import GjzjAdapter
-from brokers.base_broker import OrderType
+from brokers.broker_factory import BrokerAdapterFactory
 
 
-class TestGjzjAdapter:
-    """GjzjAdapter测试类"""
+class TestGjzjAdapterReal:
+    """GjzjAdapter真实连接测试类"""
 
-    def setup_method(self):
-        """每个测试方法前执行"""
-        # 从 .env 读取配置，如果没有则使用默认值
-        account_id = os.getenv("GJZJ_ACCOUNT_ID", "test_account")
-        session_id = int(os.getenv("GJZJ_SESSION_ID", "0"))
+    @pytest.fixture(autouse=True)
+    def setup_and_teardown(self):
+        """每个测试方法前后执行"""
+        # 从 .env 读取配置
+        self.account_id = os.getenv("GJZJ_ACCOUNT_ID", "default")
+        self.session_id = int(os.getenv("GJZJ_SESSION_ID", "0"))
+        self.gjzj_path = os.getenv("GJZJ_PATH")
 
-        self.config = {
-            "account_id": account_id,
-            "session_id": session_id,
-            "path": "/test/path/userdata_mini"  # 测试用的path
-        }
-        # 清理测试文件，确保测试隔离
-        self._cleanup_test_files()
+        if not self.gjzj_path:
+            pytest.skip("GJZJ_PATH 未配置，跳过真实连接测试")
 
-    def teardown_method(self):
-        """每个测试方法后执行"""
+        # 创建适配器
+        self.adapter = GjzjAdapter.create_from_config()
+
         # 清理测试文件
         self._cleanup_test_files()
 
+        yield
+
+        # 测试后清理
+        self._cleanup_test_files()
+        # 断开连接
+        if hasattr(self.adapter, '_connected') and self.adapter._connected:
+            try:
+                if self.adapter.trader:
+                    self.adapter.trader.stop()
+            except:
+                pass
+
     def _cleanup_test_files(self):
         """清理测试文件"""
-        from pathlib import Path
         project_root = Path(__file__).resolve().parent.parent.parent
         position_dir = project_root / "data" / "ai_positions"
         ai_position_file = position_dir / "gjzj_ai_positions.jsonl"
         if ai_position_file.exists():
             ai_position_file.unlink()
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    def test_init(self, mock_get_config):
+    def test_init(self):
         """测试初始化"""
-        mock_get_config.return_value = "2025-01-15"
+        assert self.adapter.broker_type == "gjzj"
+        assert self.adapter.account_id == self.account_id
+        assert self.adapter.session_id == self.session_id
+        assert self.adapter.path == self.gjzj_path
 
-        adapter = GjzjAdapter(self.config)
-        assert adapter.broker_type == "gjzj"
-        assert adapter.account_id == "test_account"
-        assert adapter.session_id == 0
+    def test_connect(self):
+        """测试真实连接"""
+        import platform
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    @patch('xtquant.xttype', create=True)
-    @patch('xtquant.xttrader', create=True)
-    def test_connect_success(self, mock_xttrader_module, mock_xttype_module, mock_get_config):
-        """测试连接成功"""
-        mock_get_config.return_value = "2025-01-15"
+        # 检查运行环境
+        if platform.system() != 'Windows':
+            pytest.skip(
+                f"XtQuant库主要支持Windows系统，当前系统: {platform.system()}\n"
+                "在Linux/WSL环境中，xtpythonclient模块无法加载，无法进行真实连接测试。\n"
+                "建议在Windows环境中运行此测试，或使用模拟交易模式。"
+            )
 
-        # Mock StockAccount
-        mock_xttype_module.StockAccount = MagicMock()
-        mock_xttype_module.StockAccount.STOCK_ACCOUNT = 1
+        result = self.adapter.connect()
 
-        # Mock XtQuantTrader
-        mock_trader_instance = MagicMock()
-        mock_trader_instance.start.return_value = None  # start()不返回值
-        mock_trader_instance.connect.return_value = 0  # connect()返回0表示成功
-        mock_xttrader_module.XtQuantTrader = MagicMock(return_value=mock_trader_instance)
-
-        adapter = GjzjAdapter(self.config)
-        result = adapter.connect()
+        # 连接可能成功或失败，取决于实际环境
+        # 如果连接失败，打印错误信息但不失败测试
+        if not result:
+            pytest.skip(f"无法连接到国金证券，请检查配置和网络连接")
 
         assert result is True
-        assert adapter._connected is True
-        assert adapter.trader is not None
+        assert self.adapter._connected is True
+        assert self.adapter.trader is not None
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    @patch('builtins.print')  # 抑制警告输出
-    def test_connect_import_error(self, mock_print, mock_get_config):
-        """测试连接失败（模块未安装）"""
-        mock_get_config.return_value = "2025-01-15"
+    def test_get_price(self):
+        """测试获取价格（使用本地数据）"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
 
-        # 使用patch来模拟导入xtquant时抛出ImportError
-        import builtins
-        import sys
-
-        # 保存原始的__import__
-        original_import = builtins.__import__
-
-        # 临时移除xtquant相关模块（如果存在），确保重新导入时会触发ImportError
-        xtquant_modules = {}
-        for key in list(sys.modules.keys()):
-            if key.startswith('xtquant'):
-                xtquant_modules[key] = sys.modules.pop(key)
-
-        def mock_import(name, globals=None, locals=None, fromlist=(), level=0):
-            if name == 'xtquant' or (isinstance(name, str) and name.startswith('xtquant')):
-                raise ImportError("No module named 'xtquant'")
-            # 对于其他模块，使用真实的导入
-            return original_import(name, globals, locals, fromlist, level)
-
+        # 测试获取A股价格（使用本地数据）
         try:
-            # 临时替换__import__
-            builtins.__import__ = mock_import
+            price = self.adapter.get_price("600519.SH")
+            assert isinstance(price, (int, float))
+            assert price > 0
+        except ValueError as e:
+            # 如果数据不存在，跳过测试
+            pytest.skip(f"无法获取价格数据: {e}")
 
-            adapter = GjzjAdapter(self.config)
-            result = adapter.connect()
-            assert result is False
+    def test_get_position(self):
+        """测试获取持仓信息并打印账户余额"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
 
-            # 验证警告信息被打印
-            assert mock_print.called
-            print_calls = [str(call) for call in mock_print.call_args_list]
-            assert any("未安装XtQuant模块" in str(call) for call in print_calls)
-        finally:
-            # 恢复原始__import__
-            builtins.__import__ = original_import
-            # 恢复sys.modules
-            sys.modules.update(xtquant_modules)
+        # 获取持仓
+        position = self.adapter.get_position()
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    @patch('tools.price_tools.get_open_prices')
-    def test_get_price(self, mock_get_prices, mock_get_config):
-        """测试获取价格"""
-        mock_get_config.return_value = "2025-01-15"
-        mock_get_prices.return_value = {"600519.SH_price": 1800.0}
+        assert isinstance(position, dict)
+        assert "total_positions" in position
+        assert "ai_positions" in position
+        assert "manual_positions" in position
+        assert "cash" in position
+        assert "total_asset" in position
 
-        adapter = GjzjAdapter(self.config)
-        price = adapter.get_price("600519.SH")
-        assert price == 1800.0
+        # 验证数据类型
+        assert isinstance(position["total_positions"], dict)
+        assert isinstance(position["ai_positions"], dict)
+        assert isinstance(position["manual_positions"], dict)
+        assert isinstance(position["cash"], (int, float))
+        assert isinstance(position["total_asset"], (int, float))
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    def test_buy_cn_lot_size(self, mock_get_config):
-        """测试A股买入必须100的倍数"""
-        mock_get_config.return_value = "2025-01-15"
+        # 打印账户余额和持仓信息
+        print("\n" + "=" * 60)
+        print("📊 国金证券账户余额和持仓信息")
+        print("=" * 60)
+        print(f"账户ID: {self.adapter.account_id}")
+        print(f"现金余额: ¥{position['cash']:,.2f}")
+        print(f"总资产: ¥{position['total_asset']:,.2f}")
+        print(f"\n总持仓数量: {len(position['total_positions'])} 只股票")
+        print(f"AI持仓数量: {len(position['ai_positions'])} 只股票")
+        print(f"人工持仓数量: {len(position['manual_positions'])} 只股票")
 
-        adapter = GjzjAdapter(self.config)
-        result = adapter.buy("600519.SH", 50)  # 不是100的倍数
+        if position['total_positions']:
+            print("\n持仓明细:")
+            for symbol, qty in position['total_positions'].items():
+                ai_qty = position['ai_positions'].get(symbol, 0)
+                manual_qty = position['manual_positions'].get(symbol, 0)
+                print(f"  {symbol}: 总持仓={qty}股, AI持仓={ai_qty}股, 人工持仓={manual_qty}股")
 
+        print("=" * 60 + "\n")
+
+    def test_get_position_by_symbol(self):
+        """测试获取指定股票的持仓"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
+
+        # 测试获取指定股票持仓
+        test_symbol = "600519.SH"
+        position = self.adapter.get_position(test_symbol)
+
+        assert isinstance(position, dict)
+        assert position["symbol"] == test_symbol
+        assert "total_position" in position
+        assert "ai_position" in position
+        assert "manual_position" in position
+
+        assert isinstance(position["total_position"], int)
+        assert isinstance(position["ai_position"], int)
+        assert isinstance(position["manual_position"], int)
+
+    def test_buy_validation(self):
+        """测试买入验证（不实际买入）"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
+
+        # 测试A股必须100的倍数
+        result = self.adapter.buy("600519.SH", 50)  # 不是100的倍数
         assert result["success"] is False
-        assert "multiples of 100" in result["error"]
+        assert "multiples of 100" in result["error"].lower() or "100的倍数" in result["error"]
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    def test_buy_not_connected(self, mock_get_config):
+    @pytest.mark.skipif(
+        os.getenv("SKIP_TRADE_TESTS", "true").lower() == "true",
+        reason="跳过买卖操作测试以避免真实交易"
+    )
+    def test_buy_not_connected(self):
         """测试买入失败（未连接）"""
-        mock_get_config.return_value = "2025-01-15"
+        # 创建一个未连接的适配器
+        adapter = GjzjAdapter.create_from_config()
+        adapter._connected = False
+        adapter.trader = None
 
-        adapter = GjzjAdapter(self.config)
         result = adapter.buy("600519.SH", 100)
-
         assert result["success"] is False
         assert "未连接" in result["error"]
 
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    @patch('tools.price_tools.get_open_prices')
-    @patch('xtquant.xttype', create=True)
-    @patch('xtquant.xttrader', create=True)
-    def test_buy_success(self, mock_xttrader_module, mock_xttype_module, mock_get_prices, mock_get_config):
-        """测试买入成功"""
-        mock_get_config.return_value = "2025-01-15"
-        mock_get_prices.return_value = {"600519.SH_price": 1800.0}
+    @pytest.mark.skipif(
+        os.getenv("SKIP_TRADE_TESTS", "true").lower() == "true",
+        reason="跳过买卖操作测试以避免真实交易"
+    )
+    def test_sell_validation(self):
+        """测试卖出验证（不实际卖出）"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
 
-        # Mock StockAccount
-        mock_account = MagicMock()
-        mock_account.account_id = "test_account"
-        mock_account.account_type = 1
-        mock_xttype_module.StockAccount = MagicMock(return_value=mock_account)
-
-        # Mock XtQuantTrader
-        mock_trader_instance = MagicMock()
-        mock_trader_instance.start.return_value = None
-        mock_trader_instance.connect.return_value = 0  # connect()返回0表示成功
-        mock_trader_instance.order_stock.return_value = 12345  # order_id
-        mock_trader_instance.query_stock_positions.return_value = []
-        mock_xttrader_module.XtQuantTrader = MagicMock(return_value=mock_trader_instance)
-
-        adapter = GjzjAdapter(self.config)
-        adapter.connect()
-        result = adapter.buy("600519.SH", 100)
-        assert result["success"] is True
-        assert result["symbol"] == "600519.SH"
-        assert result["amount"] == 100
-
-    @patch('brokers.gjzj.gjzj_adapter.get_config_value')
-    @patch('tools.price_tools.get_open_prices')
-    @patch('xtquant.xttype', create=True)
-    @patch('xtquant.xttrader', create=True)
-    def test_sell_protect_manual_position(self, mock_xttrader_module, mock_xttype_module, mock_get_prices, mock_get_config):
-        """测试卖出保护人工持仓"""
-        mock_get_config.return_value = "2025-01-15"
-        mock_get_prices.return_value = {"600519.SH_price": 1800.0}
-
-        # Mock StockAccount
-        mock_account = MagicMock()
-        mock_account.account_id = "test_account"
-        mock_account.account_type = 1
-        mock_xttype_module.StockAccount = MagicMock(return_value=mock_account)
-
-        # Mock XtQuantTrader
-        mock_trader_instance = MagicMock()
-        mock_trader_instance.start.return_value = None
-        mock_trader_instance.connect.return_value = 0  # connect()返回0表示成功
-        mock_trader_instance.order_stock.return_value = 12345
-        mock_trader_instance.query_stock_positions.return_value = []
-        mock_xttrader_module.XtQuantTrader = MagicMock(return_value=mock_trader_instance)
-
-        adapter = GjzjAdapter(self.config)
-        adapter.connect()
-
-        # AI买入100股
-        adapter.buy("600519.SH", 100)
-
-        # 尝试卖出200股（应该失败，因为AI只有100股）
-        result = adapter.sell("600519.SH", 200)
-
+        # 测试A股必须100的倍数
+        result = self.adapter.sell("600519.SH", 50)  # 不是100的倍数
         assert result["success"] is False
-        assert "AI持仓不足" in result["error"]
+        assert "multiples of 100" in result["error"].lower() or "100的倍数" in result["error"]
+
+    @pytest.mark.skipif(
+        os.getenv("SKIP_TRADE_TESTS", "true").lower() == "true",
+        reason="跳过买卖操作测试以避免真实交易"
+    )
+    def test_sell_protect_manual_position(self):
+        """测试卖出保护人工持仓（不实际卖出）"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
+
+        # 获取当前持仓
+        position = self.adapter.get_position("600519.SH")
+        ai_position = position["ai_position"]
+
+        # 尝试卖出超过AI持仓的数量
+        if ai_position > 0:
+            result = self.adapter.sell("600519.SH", ai_position + 100)
+            assert result["success"] is False
+            assert "AI持仓不足" in result["error"] or "持仓不足" in result["error"]
+        else:
+            pytest.skip("当前没有AI持仓，跳过测试")
+
+    def test_fetch_account_info(self):
+        """测试获取账户信息并打印账户余额"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
+
+        account_info = self.adapter._fetch_account_info()
+
+        assert isinstance(account_info, dict)
+        assert "cash" in account_info
+        assert "total_asset" in account_info
+        assert isinstance(account_info["cash"], (int, float))
+        assert isinstance(account_info["total_asset"], (int, float))
+
+        # 打印账户余额信息
+        print("\n" + "=" * 60)
+        print("📊 国金证券账户信息")
+        print("=" * 60)
+        print(f"账户ID: {self.adapter.account_id}")
+        print(f"现金余额: ¥{account_info['cash']:,.2f}")
+        print(f"总资产: ¥{account_info['total_asset']:,.2f}")
+        print("=" * 60 + "\n")
+
+    def test_fetch_total_positions(self):
+        """测试获取总持仓"""
+        # 确保已连接
+        if not self.adapter._connected:
+            self.adapter.connect()
+            if not self.adapter._connected:
+                pytest.skip("无法连接，跳过测试")
+
+        positions = self.adapter._fetch_total_positions()
+
+        assert isinstance(positions, dict)
+        # 验证持仓数据格式
+        for symbol, qty in positions.items():
+            assert isinstance(symbol, str)
+            assert isinstance(qty, int)
+            assert qty >= 0

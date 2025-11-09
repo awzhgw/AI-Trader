@@ -50,6 +50,14 @@ class GjzjAdapter(BaseBroker):
 
             # 尝试导入XtQuant模块
             try:
+                # 检查运行环境
+                import platform
+                if platform.system() != 'Windows':
+                    print("⚠️ 警告: XtQuant库主要支持Windows系统")
+                    print(f"当前系统: {platform.system()}")
+                    print("在Linux/WSL环境中，XtQuant可能无法正常工作")
+                    print("建议在Windows环境中使用，或使用模拟交易模式")
+
                 from xtquant import xttrader
                 from xtquant.xttype import StockAccount
 
@@ -88,11 +96,26 @@ class GjzjAdapter(BaseBroker):
                     return True
 
             except ImportError as e:
-                print(f"⚠️ 警告: 未安装XtQuant模块: {e}")
-                print("请安装XtQuant: pip install xtquant")
+                error_msg = str(e)
+                print(f"⚠️ 警告: 无法导入XtQuant模块: {e}")
+                if 'xtpythonclient' in error_msg:
+                    print("错误原因: xtpythonclient模块无法加载")
+                    print("可能的原因:")
+                    print("  1. XtQuant库主要支持Windows系统，Linux/WSL环境可能无法正常工作")
+                    print("  2. 缺少必要的系统依赖或DLL文件")
+                    print("  3. Python版本不匹配")
+                    print("\n建议:")
+                    print("  - 在Windows环境中使用XtQuant")
+                    print("  - 或使用模拟交易模式（BROKER_MODE=mock）")
+                    print("  - 参考文档: http://dict.thinktrader.net/nativeApi/start_now.html")
+                else:
+                    print("请安装XtQuant: pip install xtquant")
                 return False
             except Exception as e:
                 print(f"XtQuant连接失败: {e}")
+                import traceback
+                print("详细错误信息:")
+                traceback.print_exc()
                 return False
 
         except Exception as e:
