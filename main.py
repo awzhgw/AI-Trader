@@ -194,8 +194,25 @@ async def main(config_path=None):
         model_name = model_config.get("name", "unknown")
         basemodel = model_config.get("basemodel")
         signature = model_config.get("signature")
-        openai_base_url = model_config.get("openai_base_url",None)
-        openai_api_key = model_config.get("openai_api_key",None)
+        openai_base_url = model_config.get("openai_base_url", None)
+        openai_api_key = model_config.get("openai_api_key", None)
+
+        # Auto-configure API credentials from .env based on model name if not provided in config
+        if not openai_base_url or not openai_api_key:
+            env_prefix = None
+            model_name_lower = model_name.lower()
+            if "deepseek" in model_name_lower:
+                env_prefix = "DEEPSEEK"
+            elif "minimax" in model_name_lower:
+                env_prefix = "MINMAX"
+            elif "gemini" in model_name_lower:
+                env_prefix = "GEMINI"
+            
+            if env_prefix:
+                if not openai_base_url:
+                    openai_base_url = os.getenv(f"{env_prefix}_API_BASE")
+                if not openai_api_key:
+                    openai_api_key = os.getenv(f"{env_prefix}_API_KEY")
         
         # Validate required fields
         if not basemodel:

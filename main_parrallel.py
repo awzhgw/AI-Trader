@@ -104,6 +104,23 @@ async def _run_model_in_current_process(AgentClass, model_config, INIT_DATE, END
     openai_base_url = model_config.get("openai_base_url", None)
     openai_api_key = model_config.get("openai_api_key", None)
 
+    # Auto-configure API credentials from .env based on model name if not provided in config
+    if not openai_base_url or not openai_api_key:
+        env_prefix = None
+        model_name_lower = model_name.lower()
+        if "deepseek" in model_name_lower:
+            env_prefix = "DEEPSEEK"
+        elif "minimax" in model_name_lower:
+            env_prefix = "MINMAX"
+        elif "gemini" in model_name_lower:
+            env_prefix = "GEMINI"
+        
+        if env_prefix:
+            if not openai_base_url:
+                openai_base_url = os.getenv(f"{env_prefix}_API_BASE")
+            if not openai_api_key:
+                openai_api_key = os.getenv(f"{env_prefix}_API_KEY")
+
     if not basemodel:
         print(f"❌ Model {model_name} missing basemodel field")
         return
