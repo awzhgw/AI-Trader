@@ -3,35 +3,39 @@ XtQuant适配器（A股）
 基于迅投XtQuant交易模块
 参考文档: https://dict.thinktrader.net/nativeApi/xttrader.html
 """
+import os
 from typing import Dict, Optional, Any, List
 
 from brokers.base_broker import BaseBroker, OrderType
 from tools.general_tools import get_config_value
 
 
-class XtQuantAdapter(BaseBroker):
-    """XtQuant适配器（A股）"""
+class GjzjAdapter(BaseBroker):
+    """Gjzj适配器（A股）"""
 
     def __init__(self, config: Dict[str, Any]):
         """
         Args:
-            config: 配置字典，包含 account_id, session_id 等
+            config: 配置字典，包含 account_id, session_id, strategy_name, path 等
         """
         super().__init__(config)
-        self.account_id = config.get("account_id", "default")
+        # account_id已经在BaseBroker中设置，这里不需要再设置
+        # 但如果config中有account_id，BaseBroker会使用它
         self.session_id = config.get("session_id", 0)  # 会话ID
+        self.strategy_name = config.get("strategy_name", "AI-Trader")  # 策略名称
+        self.path = config.get("path", None)  # MiniQMT客户端userdata_mini路径
         self.trader = config.get("trader", None)  # XtQuantTrader实例
         self._connected = False
 
     @classmethod
-    def create_from_config(cls) -> 'XtQuantAdapter':
+    def create_from_config(cls) -> 'GjzjAdapter':
         """从环境变量创建适配器"""
         from brokers.broker_factory import BrokerAdapterFactory
-        config = BrokerAdapterFactory.get_broker_config("xtquant")
+        config = BrokerAdapterFactory.get_broker_config("gjzj")
         return cls(config)
 
     def _get_broker_type(self) -> str:
-        return "xtquant"
+        return "gjzj"
 
     def connect(self) -> bool:
         """
@@ -47,43 +51,74 @@ class XtQuantAdapter(BaseBroker):
 
             # 尝试导入XtQuant模块
             try:
+                # 检查运行环境
+                import platform
+                if platform.system() != 'Windows':
+                    print("⚠️ 警告: XtQuant库主要支持Windows系统")
+                    print(f"当前系统: {platform.system()}")
+                    print("在Linux/WSL环境中，XtQuant可能无法正常工作")
+                    print("建议在Windows环境中使用，或使用模拟交易模式")
+
                 from xtquant import xttrader
                 from xtquant.xttype import StockAccount
 
                 # 创建XtQuantTrader实例
                 if self.trader is None:
+                    # 检查path配置
+                    if self.path is None:
+                        print("⚠️ 警告: 未配置XtQuant path参数")
+                        return False
+
+                    # 检查路径是否存在
+                    if not os.path.exists(self.path):
+                        print(f"⚠️ 警告: 指定的路径不存在: {self.path}")
+                        return False
+
                     # 创建API实例
-                    self.trader = xttrader.XtQuantTrader()
+                    # XtQuantTrader(path, session_id, callback=None)
+                    self.trader = xttrader.XtQuantTrader(self.path, self.session_id)
 
                     # 注册回调类（可选）
                     # callback = MyXtQuantTraderCallback()
                     # self.trader.register_callback(callback)
 
-                    # 准备API环境
-                    self.trader.prepare()
+                    # 启动交易线程
+                    self.trader.start()
 
                     # 创建连接
-                    # 参数: session_id, account_type
-                    # session_id: 会话ID，0表示使用默认会话
-                    # account_type: 账号类型，StockAccount.STOCK_ACCOUNT表示股票账号
-                    self.session_id = self.trader.start(session_id=self.session_id)
+                    # connect()返回0表示连接成功
+                    connect_result = self.trader.connect()
 
-                    if self.session_id > 0:
+                    if connect_result == 0:
                         self._connected = True
                         return True
                     else:
-                        print(f"XtQuant连接失败: session_id={self.session_id}")
+                        print(f"XtQuant连接失败: connect_result={connect_result}")
                         return False
                 else:
                     self._connected = True
                     return True
 
             except ImportError as e:
-                print(f"⚠️ 警告: 未安装XtQuant模块: {e}")
-                print("请安装XtQuant: pip install xtquant")
+                error_msg = str(e)
+                print(f"⚠️ 警告: 无法导入XtQuant模块: {e}")
+                if 'xtpythonclient' in error_msg:
+                    print("错误原因: xtpythonclient模块无法加载")
+                    print("可能的原因:")
+                    print("  1. XtQuant库主要支持Windows系统，Linux/WSL环境可能无法正常工作")
+                    print("  2. 缺少必要的系统依赖或DLL文件")
+                    print("  3. Python版本不匹配")
+                    print("\n建议:")
+                    print("  - 在Windows环境中使用XtQuant")
+                    print("  - 参考文档: http://dict.thinktrader.net/nativeApi/start_now.html")
+                else:
+                    print("请安装XtQuant: pip install xtquant")
                 return False
             except Exception as e:
                 print(f"XtQuant连接失败: {e}")
+                import traceback
+                print("详细错误信息:")
+                traceback.print_exc()
                 return False
 
         except Exception as e:
@@ -125,13 +160,11 @@ class XtQuantAdapter(BaseBroker):
         try:
             if self.trader is not None and self._connected:
                 # XtQuant API: query_stock_positions
-                # 参数: account_id, account_type
+                # 参数: account (StockAccount对象)
                 from xtquant.xttype import StockAccount
 
-                positions = self.trader.query_stock_positions(
-                    account_id=self.account_id,
-                    account_type=StockAccount.STOCK_ACCOUNT
-                )
+                account = StockAccount(self.account_id, 'STOCK')
+                positions = self.trader.query_stock_positions(account)
 
                 if positions:
                     result = {}
@@ -143,6 +176,9 @@ class XtQuantAdapter(BaseBroker):
                         if volume > 0:
                             result[stock_code] = volume
                     return result
+                else:
+                    # positions为None或空列表时返回空字典
+                    return {}
             else:
                 print("⚠️ 警告: XtQuant未连接，无法获取真实持仓")
                 return {}
@@ -160,13 +196,11 @@ class XtQuantAdapter(BaseBroker):
         try:
             if self.trader is not None and self._connected:
                 # XtQuant API: query_stock_asset
-                # 参数: account_id, account_type
+                # 参数: account (StockAccount对象)
                 from xtquant.xttype import StockAccount
 
-                asset = self.trader.query_stock_asset(
-                    account_id=self.account_id,
-                    account_type=StockAccount.STOCK_ACCOUNT
-                )
+                account = StockAccount(self.account_id, 'STOCK')
+                asset = self.trader.query_stock_asset(account)
 
                 if asset:
                     # asset是XtAsset对象
@@ -190,6 +224,11 @@ class XtQuantAdapter(BaseBroker):
     ) -> Dict[str, Any]:
         """买入股票"""
 
+        # 交易前检查
+        is_ok, error_result = self._pre_trade_check(symbol, amount, price, order_type, is_buy=True)
+        if not is_ok:
+            return error_result
+
         # A股必须100的倍数
         if amount % 100 != 0:
             return {
@@ -197,14 +236,6 @@ class XtQuantAdapter(BaseBroker):
                 "error": f"Chinese A-shares must be traded in multiples of 100 shares. You tried to buy {amount} shares.",
                 "symbol": symbol,
                 "amount": amount,
-            }
-
-        # 检查连接
-        if not self._connected or self.trader is None:
-            return {
-                "success": False,
-                "error": "XtQuant未连接，请先调用connect()方法",
-                "symbol": symbol,
             }
 
         # 获取价格（限价单需要）
@@ -223,34 +254,44 @@ class XtQuantAdapter(BaseBroker):
             from xtquant.xttype import StockAccount
 
             # XtQuant API: order_stock
-            # 参数: account_id, account_type, order_type, stock_code, order_volume, price_type, price, strategy_name, order_remark
-            # order_type: 委托类型，1=买入，2=卖出
+            # 参数: account, stock_code, order_type, order_volume, price_type, price, strategy_name, order_remark
+            # account: StockAccount对象（包含account_id和account_type）
+            # order_type: 委托类型，23=买入，24=卖出
             # price_type: 报价类型，0=限价，4=市价
 
-            order_type_code = 1  # 买入
+            # 创建StockAccount对象
+            account = StockAccount(self.account_id, 'STOCK')
+
+            order_type_code = 23  # 买入（23=买，24=卖）
             price_type = 0 if order_type == OrderType.LIMIT else 4  # 0=限价，4=市价
             order_price = price if order_type == OrderType.LIMIT else 0.0
 
-            strategy_name = get_config_value("XTQUANT_STRATEGY_NAME", "AI-Trader")
             order_remark = f"XtQuant买入 {symbol} {amount}股"
 
             # 同步下单
             order_id = self.trader.order_stock(
-                account_id=self.account_id,
-                account_type=StockAccount.STOCK_ACCOUNT,
-                order_type=order_type_code,
+                account=account,
                 stock_code=symbol,
+                order_type=order_type_code,
                 order_volume=amount,
                 price_type=price_type,
                 price=order_price,
-                strategy_name=strategy_name,
+                strategy_name=self.strategy_name,
                 order_remark=order_remark
             )
 
             if order_id > 0:
-                # 查询总持仓
+                # 等待一小段时间，让订单执行
+                import time
+                time.sleep(0.5)
+
+                # 查询实际总持仓（而不是假设）
                 total_positions = self._fetch_total_positions()
-                total_qty = total_positions.get(symbol, 0) + amount  # 假设买入成功
+                total_qty = total_positions.get(symbol, 0)
+
+                # 如果查询到的持仓没有增加，可能是订单还在处理中
+                # 这里我们仍然记录，因为订单已经提交成功
+                # 实际持仓会在后续查询中更新
 
                 # 记录到AI持仓管理器
                 actual_price = price if price else self.get_price(symbol)
@@ -264,12 +305,13 @@ class XtQuantAdapter(BaseBroker):
                 return {
                     "success": True,
                     "order_id": str(order_id),
-                    "message": "买入成功",
+                    "message": "买入订单已提交",
                     "symbol": symbol,
                     "amount": amount,
                     "price": actual_price,
                     "ai_position": self.ai_position_manager.get_ai_position(symbol),
                     "total_position": total_qty,
+                    "note": "订单已提交，实际持仓可能稍后更新",
                 }
             else:
                 return {
@@ -300,6 +342,11 @@ class XtQuantAdapter(BaseBroker):
     ) -> Dict[str, Any]:
         """卖出股票（保护人工持仓）"""
 
+        # 交易前检查
+        is_ok, error_result = self._pre_trade_check(symbol, amount, price, order_type, is_buy=False)
+        if not is_ok:
+            return error_result
+
         # A股必须100的倍数
         if amount % 100 != 0:
             return {
@@ -309,33 +356,10 @@ class XtQuantAdapter(BaseBroker):
                 "amount": amount,
             }
 
-        # 检查连接
-        if not self._connected or self.trader is None:
-            return {
-                "success": False,
-                "error": "XtQuant未连接，请先调用connect()方法",
-                "symbol": symbol,
-            }
-
-        # 查询券商账户总持仓
+        # 查询券商账户总持仓（用于后续计算）
         total_positions = self._fetch_total_positions()
         total_qty = total_positions.get(symbol, 0)
-
-        # 查询AI持仓
         ai_qty = self.ai_position_manager.get_ai_position(symbol)
-
-        # 检查是否可以卖出
-        can_sell, reason = self._check_sell_permission(symbol, amount)
-        if not can_sell:
-            return {
-                "success": False,
-                "error": reason,
-                "symbol": symbol,
-                "amount": amount,
-                "ai_position": ai_qty,
-                "total_position": total_qty,
-                "manual_position": total_qty - ai_qty,
-            }
 
         # 获取价格（限价单需要）
         if order_type == OrderType.LIMIT and price is None:
@@ -353,29 +377,41 @@ class XtQuantAdapter(BaseBroker):
             from xtquant.xttype import StockAccount
 
             # XtQuant API: order_stock
-            order_type_code = 2  # 卖出
+            # 参数: account, stock_code, order_type, order_volume, price_type, price, strategy_name, order_remark
+            # account: StockAccount对象（包含account_id和account_type）
+            # order_type: 委托类型，23=买入，24=卖出
+
+            # 创建StockAccount对象
+            account = StockAccount(self.account_id, 'STOCK')
+
+            order_type_code = 24  # 卖出（23=买，24=卖）
             price_type = 0 if order_type == OrderType.LIMIT else 4  # 0=限价，4=市价
             order_price = price if order_type == OrderType.LIMIT else 0.0
 
-            strategy_name = get_config_value("XTQUANT_STRATEGY_NAME", "AI-Trader")
             order_remark = f"XtQuant卖出 {symbol} {amount}股"
 
             # 同步下单
             order_id = self.trader.order_stock(
-                account_id=self.account_id,
-                account_type=StockAccount.STOCK_ACCOUNT,
-                order_type=order_type_code,
+                account=account,
                 stock_code=symbol,
+                order_type=order_type_code,
                 order_volume=amount,
                 price_type=price_type,
                 price=order_price,
-                strategy_name=strategy_name,
+                strategy_name=self.strategy_name,
                 order_remark=order_remark
             )
 
             if order_id > 0:
+                # 等待一小段时间，让订单执行
+                import time
+                time.sleep(0.5)
+
+                # 查询实际总持仓（而不是假设）
+                new_total_positions = self._fetch_total_positions()
+                new_total_qty = new_total_positions.get(symbol, 0)
+
                 # 更新AI持仓管理器
-                new_total_qty = max(0, total_qty - amount)
                 actual_price = price if price else self.get_price(symbol)
                 self.ai_position_manager.record_sell(
                     symbol=symbol,
@@ -387,12 +423,13 @@ class XtQuantAdapter(BaseBroker):
                 return {
                     "success": True,
                     "order_id": str(order_id),
-                    "message": f"卖出成功，AI持仓剩余: {ai_qty - amount}",
+                    "message": f"卖出订单已提交，AI持仓剩余: {ai_qty - amount}",
                     "symbol": symbol,
                     "amount": amount,
                     "price": actual_price,
                     "ai_position": ai_qty - amount,
                     "total_position": new_total_qty,
+                    "note": "订单已提交，实际持仓可能稍后更新",
                 }
             else:
                 return {

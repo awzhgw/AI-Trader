@@ -8,7 +8,7 @@
   "models": [
     {
       "name": "claude-3.7-sonnet",
-      "basemodel": "claude-3-7-sonnet-20250219", 
+      "basemodel": "claude-3-7-sonnet-20250219",
       "signature": "claude-3.7-sonnet",
       "enabled": false
     },
@@ -40,13 +40,13 @@
       "name": "gpt-4.1",
       "basemodel": "openai/gpt-4.1",
       "signature": "gpt-4.1",
-      "enabled": true
+      "enabled": false
     },
     {
       "name": "MiniMax-M2",
       "basemodel": "minimax/minimax-m2",
       "signature": "MiniMax-M2",
-      "enabled": false
+      "enabled": true
     }
   ],
   "agent_config": {
@@ -59,4 +59,3 @@
     "log_path": "./data/agent_data_astock"
   }
 }
-

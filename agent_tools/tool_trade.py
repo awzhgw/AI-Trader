@@ -2,11 +2,15 @@ import os
 import sys
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
 from fastmcp import FastMCP
 
 from typing import Dict, List, Optional, Any
 import fcntl
 from pathlib import Path
+
+load_dotenv()
+
 # Add project root directory to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
@@ -17,6 +21,8 @@ from tools.price_tools import (get_latest_position, get_open_prices,
                                get_yesterday_date,
                                get_yesterday_open_and_close_price,
                                get_yesterday_profit)
+from brokers.broker_factory import BrokerAdapterFactory
+from brokers.base_broker import OrderType
 
 mcp = FastMCP("TradeTools")
 
@@ -185,6 +191,28 @@ def buy(symbol: str, amount: int) -> Dict[str, Any]:
             "date": today_date,
         }
     else:
+        # Step 4.5: Execute Real Broker Trade (if enabled)
+        broker_mode = get_config_value("BROKER_MODE")
+        if broker_mode and broker_mode in ["gjzj", "futu", "auto"]:
+            try:
+                broker = BrokerAdapterFactory.create_broker(symbol=symbol, broker_mode=broker_mode)
+                broker_result = broker.buy(symbol=symbol, amount=amount, order_type=OrderType.MARKET)
+                if broker_result.get("error"):
+                    return {
+                        "error": f"Broker buy failed: {broker_result.get('error')}",
+                        "symbol": symbol,
+                        "amount": amount,
+                        "date": today_date,
+                        "broker_result": broker_result
+                    }
+            except Exception as e:
+                return {
+                    "error": f"Broker execution exception: {str(e)}",
+                    "symbol": symbol,
+                    "amount": amount,
+                    "date": today_date
+                }
+
         # Step 5: Execute buy operation, update position
         # Create a copy of current position to avoid directly modifying original data
         new_position = current_position.copy()
@@ -390,6 +418,28 @@ def sell(symbol: str, amount: int) -> Dict[str, Any]:
                     "want_to_sell": amount,
                     "date": today_date,
                 }
+
+    # Step 4.5: Execute Real Broker Trade (if enabled)
+    broker_mode = get_config_value("BROKER_MODE")
+    if broker_mode and broker_mode in ["gjzj", "futu", "auto"]:
+        try:
+            broker = BrokerAdapterFactory.create_broker(symbol=symbol, broker_mode=broker_mode)
+            broker_result = broker.sell(symbol=symbol, amount=amount, order_type=OrderType.MARKET)
+            if broker_result.get("error"):
+                return {
+                    "error": f"Broker sell failed: {broker_result.get('error')}",
+                    "symbol": symbol,
+                    "amount": amount,
+                    "date": today_date,
+                    "broker_result": broker_result
+                }
+        except Exception as e:
+            return {
+                "error": f"Broker execution exception: {str(e)}",
+                "symbol": symbol,
+                "amount": amount,
+                "date": today_date
+            }
 
     # Step 5: Execute sell operation, update position
     # Create a copy of current position to avoid directly modifying original data

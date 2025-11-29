@@ -3,9 +3,8 @@
 ## 概述
 
 本系统实现了统一的多券商交易接口，支持：
-- **XtQuant API**（迅投XtQuant A股量化交易）
+- **Gjzj API**（基于迅投XtQuant A股量化交易）
 - **Futu API**（富途证券美股量化交易）
-- **模拟交易模式**（现有功能，向后兼容）
 
 **核心特性：保护用户人工持仓，AI只操作自己买入的股票。**
 
@@ -17,15 +16,12 @@ brokers/
 ├── base_broker.py              # 抽象基类
 ├── broker_factory.py            # 工厂类
 ├── ai_position_manager.py       # AI持仓管理器
-├── xtquant/                     # XtQuant适配器
+├── gjzj/                        # Gjzj适配器
 │   ├── __init__.py
-│   └── xtquant_adapter.py
-├── futu/                        # Futu适配器
-│   ├── __init__.py
-│   └── futu_adapter.py
-└── mock/                        # 模拟交易适配器
+│   └── gjzj_adapter.py
+└── futu/                        # Futu适配器
     ├── __init__.py
-    └── mock_adapter.py
+    └── futu_adapter.py
 ```
 
 ## 核心组件
@@ -58,16 +54,12 @@ brokers/
 - `create_broker()`: 创建券商适配器
 - `detect_market()`: 根据股票代码识别市场（A股/美股）
 
-### 4. MockAdapter（模拟交易适配器）
+### 4. GjzjAdapter（A股适配器）
 
-兼容现有的模拟交易功能，同时支持AI持仓管理。
-
-### 5. XtQuantAdapter（A股适配器）
-
-XtQuant API的适配器，用于A股交易。基于迅投XtQuant交易模块。
+Gjzj API的适配器，用于A股交易。基于迅投XtQuant交易模块。
 参考文档: https://dict.thinktrader.net/nativeApi/xttrader.html
 
-### 6. FutuAdapter（美股适配器）
+### 5. FutuAdapter（美股适配器）
 
 Futu API的适配器，用于美股交易。
 
@@ -99,11 +91,8 @@ print(f"人工持仓: {position['manual_positions']}")
 ### 指定券商模式
 
 ```python
-# 使用Mock模式
-broker = BrokerAdapterFactory.create_broker(broker_mode="mock")
-
-# 使用XtQuant模式（A股）
-broker = BrokerAdapterFactory.create_broker(broker_mode="xtquant")
+# 使用Gjzj模式（A股）
+broker = BrokerAdapterFactory.create_broker(broker_mode="gjzj")
 
 # 使用Futu模式（美股）
 broker = BrokerAdapterFactory.create_broker(broker_mode="futu")
@@ -115,13 +104,13 @@ broker = BrokerAdapterFactory.create_broker(symbol="600519.SH", broker_mode="aut
 ## 环境变量配置
 
 ```bash
-# 交易模式: "mock" | "xtquant" | "futu" | "auto"
+# 交易模式: "gjzj" | "futu" | "auto"
 BROKER_MODE=auto
 
-# XtQuant配置（A股）
-XTQUANT_ENABLED=true
-XTQUANT_ACCOUNT_ID=your_account_id
-XTQUANT_SESSION_ID=0  # 会话ID，0表示默认会话
+# Gjzj配置（A股）
+GJZJ_ENABLED=true
+GJZJ_ACCOUNT_ID=your_account_id
+GJZJ_SESSION_ID=0  # 会话ID，0表示默认会话
 
 # Futu配置（美股）
 FUTU_ENABLED=true
@@ -191,28 +180,26 @@ pytest tests/brokers/ -v
 
 # 运行特定测试
 pytest tests/brokers/test_ai_position_manager.py -v
-pytest tests/brokers/test_mock_adapter.py -v
 ```
 
 详细测试说明请参考：`tests/brokers/README.md`
 
 ## 注意事项
 
-1. **XtQuant适配器**：
+1. **Gjzj适配器**：
    - 需要安装XtQuant模块: `pip install xtquant`
    - 需要先调用`connect()`方法建立连接
    - 支持同步和异步下单（当前实现使用同步下单）
    - 参考文档: https://dict.thinktrader.net/nativeApi/xttrader.html
 
 2. **Futu适配器**：目前是框架实现，实际的API调用部分需要根据实际API文档完善
-2. **向后兼容**：MockAdapter完全兼容现有的模拟交易功能
 3. **数据隔离**：不同账户的AI持仓记录是隔离的
-4. **文件锁**：MockAdapter使用文件锁确保并发安全
 
 ## 后续开发
 
-1. 完善XtQuant和Futu的实际API调用
+1. 完善Gjzj和Futu的实际API调用
 2. 添加更多券商支持
 3. 添加持仓保护列表功能
 4. 添加交易历史查询功能
 5. 添加性能监控和日志
+
