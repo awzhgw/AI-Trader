@@ -6,15 +6,15 @@
   },
   "models": [
     {
-      "name": "deepseek-chat-v3.1",
-      "basemodel": "deepseek/deepseek-chat-v3.1",
-      "signature": "deepseek-chat-v3.1",
+      "name": "deepseek-chat",
+      "basemodel": "deepseek-chat",
+      "signature": "deepseek-chat-guoweilong",
       "enabled": false
     },
     {
       "name": "gemini-3-pro-preview",
       "basemodel": "gemini-3-pro-preview[x6]",
-      "signature": "gemini-3-pro-preview[x6]",
+      "signature": "gemini-3-pro-preview-guoweilong",
       "enabled": false
     }
   ],

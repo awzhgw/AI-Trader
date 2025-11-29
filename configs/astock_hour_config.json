@@ -7,21 +7,21 @@
   },
   "models": [
     {
-      "name": "deepseek-chat-v3.1",
-      "basemodel": "deepseek/deepseek-chat-v3.1",
-      "signature": "deepseek-chat-v3.1-astock-hour",
+      "name": "deepseek-chat",
+      "basemodel": "deepseek-chat",
+      "signature": "deepseek-chat-guoweilong",
       "enabled": false
     },
     {
       "name": "gemini-3-pro-preview",
       "basemodel": "gemini-3-pro-preview[x6]",
-      "signature": "gemini-3-pro-preview[x6]-astock-hour",
+      "signature": "gemini-3-pro-preview-guoweilong",
       "enabled": false
     },
     {
       "name": "MiniMax-M2",
-      "basemodel": "minimax/minimax-m2",
-      "signature": "MiniMax-M2-astock-hour",
+      "basemodel": "MiniMax-M2",
+      "signature": "MiniMax-M2-guoweilong",
       "enabled": true
     }
   ],
