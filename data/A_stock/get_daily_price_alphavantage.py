@@ -107,6 +107,8 @@ def load_existing_data(filepath: str):
             return None
     return None
 
+import time
+
 def get_daily_price(SYMBOL: str):
     FUNCTION = "TIME_SERIES_DAILY"
     OUTPUTSIZE = "compact"
@@ -114,19 +116,35 @@ def get_daily_price(SYMBOL: str):
     url = (
         f"https://www.alphavantage.co/query?function={FUNCTION}&symbol={SYMBOL}&entitlement=delayed&outputsize={OUTPUTSIZE}&apikey={APIKEY}"
     )
-    r = requests.get(url)
-    data = r.json()
+    try:
+        r = requests.get(url)
+        data = r.json()
+    except Exception as e:
+        print(f"Error fetching data for {SYMBOL}: {e}")
+        return
+
+    if "Meta Data" not in data:
+        print(f"Failed to get data for {SYMBOL}")
+        if "Note" in data:
+            print(f"Rate limit warning: {data['Note']}")
+        elif "Error Message" in data:
+            print(f"API Error: {data['Error Message']}")
+        else:
+            print(f"Response: {data}")
+        return
+
     stock_name = data.get("Meta Data").get("2. Symbol")
     print("Done for ", stock_name)
-    if data.get("Note") is not None or data.get("Information") is not None:
-        print(f"Error")
-        exit()
-        return
+    
     if OUTPUTSIZE == "full":
         data = filter_data(data, "2025-10-01")
     
     # 合并数据：保留已存在的日期，只添加新日期
     output_file = f"./A_stock_data/daily_prices_{SYMBOL}.json"
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
     existing_data = load_existing_data(output_file)
     data = merge_data(existing_data, data)
     
@@ -156,4 +174,8 @@ def get_daily_price(SYMBOL: str):
 if __name__ == "__main__":
     for symbol in sse_50_codes:
         get_daily_price(symbol)
+        # Alpha Vantage free tier limit: 5 calls per minute.
+        # Sleep 12 seconds to be safe (60/5 = 12).
+        print("Waiting 12s to respect API rate limits...")
+        time.sleep(12)
     get_daily_price("000016.SHH")

@@ -293,7 +293,12 @@ class BaseAgentCrypto:
 
     def _setup_logging(self, today_date: str) -> str:
         """Set up log file path"""
-        log_path = os.path.join(self.base_log_path, self.signature, "log", today_date)
+        # Replace spaces with underscores for Windows compatibility
+        safe_date = today_date.replace(" ", "_")
+        # Replace colons with dashes for Windows compatibility (Windows paths cannot contain :)
+        safe_date = safe_date.replace(":", "-")
+        
+        log_path = os.path.join(self.base_log_path, self.signature, "log", safe_date)
         if not os.path.exists(log_path):
             os.makedirs(log_path)
         return os.path.join(log_path, "log.jsonl")

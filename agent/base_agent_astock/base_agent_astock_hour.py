@@ -326,6 +326,18 @@ class BaseAgentAStock_Hour(BaseAgentAStock):
         # Handle trading results
         await self._handle_trading_result(today_date)
 
+    def _setup_logging(self, today_date: str) -> str:
+        """Set up log file path"""
+        # Replace spaces with underscores for Windows compatibility
+        safe_date = today_date.replace(" ", "_")
+        # Replace colons with dashes for Windows compatibility (Windows paths cannot contain :)
+        safe_date = safe_date.replace(":", "-")
+        
+        log_path = os.path.join(self.base_log_path, self.signature, "log", safe_date)
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
+        return os.path.join(log_path, "log.jsonl")
+
     def _is_valid_astock_trading_time(self, timestamp: str) -> bool:
         """
         Validate if timestamp is a valid A-shares trading time

@@ -54,10 +54,12 @@ class GjzjAdapter(BaseBroker):
                 return False
 
             if self.trader is None:
+                print(f"正在连接XtQuant, 路径: {self.path}, session_id: {self.session_id}")
                 self.trader = xttrader.XtQuantTrader(self.path, self.session_id)
                 self.trader.start()
-                if self.trader.connect() != 0:
-                    print("XtQuant连接失败")
+                connect_result = self.trader.connect()
+                if connect_result != 0:
+                    print(f"XtQuant连接失败，错误码: {connect_result}")
                     return False
             
             self._connected = True
