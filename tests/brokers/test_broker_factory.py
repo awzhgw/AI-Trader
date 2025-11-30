@@ -50,7 +50,7 @@ class TestBrokerAdapterFactory:
 
     def test_create_broker_invalid(self):
         """测试无效的broker模式"""
-        with pytest.raises(ValueError, match="Unknown or unsupported broker mode"):
+        with pytest.raises(ValueError, match="Unsupported broker mode"):
             BrokerAdapterFactory.create_broker(broker_mode="invalid_mode")
 
     @pytest.mark.parametrize("symbol, mode, patch_target", [
