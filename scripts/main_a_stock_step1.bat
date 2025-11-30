@@ -15,7 +15,7 @@ set "PROJECT_ROOT=%CD%"
 
 echo [Step 1] Preparing A-Stock Data...
 cd data\A_stock
-%PYTHON_CMD% get_daily_price_xtquant.py
-%PYTHON_CMD% merge_jsonl_xtquant.py
+%PYTHON_CMD% get_interdaily_price_astock.py
+%PYTHON_CMD% merge_json_hourly.py
 echo Done.
 pause

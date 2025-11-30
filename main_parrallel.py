@@ -23,6 +23,10 @@ AGENT_REGISTRY = {
         "module": "agent.base_agent.base_agent_hour",
         "class": "BaseAgent_Hour"
     },
+    "BaseAgentAStock_Hour": {
+        "module": "agent.base_agent_astock.base_agent_astock_hour",
+        "class": "BaseAgentAStock_Hour"
+    },
 }
 
 

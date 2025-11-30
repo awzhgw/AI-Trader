@@ -166,11 +166,21 @@ class BaseAgentAStock_Hour(BaseAgentAStock):
                 try:
                     doc = json.loads(line)
                     # Find all keys starting with "Time Series"
+                    found_time_series = False
                     for key, value in doc.items():
                         if key.startswith("Time Series"):
                             if isinstance(value, dict):
                                 all_timestamps.update(value.keys())
+                                found_time_series = True
                             break
+                    
+                    # If no "Time Series" key found, check if keys themselves are timestamps
+                    if not found_time_series:
+                        for key in doc.keys():
+                            # Check if key looks like a timestamp (YYYY-MM-DD HH:MM:SS)
+                            # Basic check: contains space, dash and colon
+                            if isinstance(key, str) and " " in key and "-" in key and ":" in key:
+                                all_timestamps.add(key)
                 except Exception:
                     continue
 
