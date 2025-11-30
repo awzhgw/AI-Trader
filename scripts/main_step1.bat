@@ -14,8 +14,8 @@ cd /d "%SCRIPT_DIR%\.."
 set "PROJECT_ROOT=%CD%"
 
 echo [Step 1] Preparing Data...
-cd data
-%PYTHON_CMD% get_interdaily_price.py
-%PYTHON_CMD% merge_jsonl.py
+cd data\US_stock
+%PYTHON_CMD% get_us_stock_price.py
+%PYTHON_CMD% merge_us_stock_jsonl.py
 echo Done.
 pause

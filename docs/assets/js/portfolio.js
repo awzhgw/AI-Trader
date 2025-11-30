@@ -28,7 +28,7 @@ async function loadDataAndRefresh() {
 
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('Failed to load portfolio data. Please check console for details.');
+        alert('加载投资组合数据失败。请查看控制台了解详情。');
     } finally {
         hideLoading();
     }
@@ -41,7 +41,7 @@ async function init() {
 
     // Load initial data
     await loadDataAndRefresh();
-    
+
     // Initialize UI state
     updateMarketUI();
 }
@@ -168,7 +168,7 @@ async function updateHoldingsTable(agentName) {
         const noDataRow = document.createElement('tr');
         noDataRow.innerHTML = `
             <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                No holdings data available
+                暂无持仓数据
             </td>
         `;
         tableBody.appendChild(noDataRow);
@@ -206,7 +206,7 @@ async function updateAllocationChart(agentName) {
     const othersValue = allocations.slice(10).reduce((sum, a) => sum + a.value, 0);
 
     if (othersValue > 0) {
-        topAllocations.push({ label: 'Others', value: othersValue });
+        topAllocations.push({ label: '其他', value: othersValue });
     }
 
     // Destroy existing chart
@@ -254,7 +254,7 @@ async function updateAllocationChart(agentName) {
                     borderWidth: 1,
                     padding: 12,
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             const label = context.label || '';
                             const value = dataLoader.formatCurrency(context.parsed);
                             const total = context.dataset.data.reduce((sum, v) => sum + v, 0);
@@ -275,7 +275,7 @@ function updateTradeHistory(agentName) {
     timeline.innerHTML = '';
 
     if (trades.length === 0) {
-        timeline.innerHTML = '<p style="color: var(--text-muted);">No trade history available.</p>';
+        timeline.innerHTML = '<p style="color: var(--text-muted);">暂无交易历史。</p>';
         return;
     }
 
@@ -288,13 +288,13 @@ function updateTradeHistory(agentName) {
 
         const icon = trade.action === 'buy' ? '📈' : '📉';
         const iconClass = trade.action === 'buy' ? 'buy' : 'sell';
-        const actionText = trade.action === 'buy' ? 'Bought' : 'Sold';
+        const actionText = trade.action === 'buy' ? '买入' : '卖出';
 
         // Format the timestamp for hourly data
         let formattedDate = trade.date;
         if (trade.date.includes(':')) {
             const date = new Date(trade.date);
-            formattedDate = date.toLocaleString('en-US', {
+            formattedDate = date.toLocaleString('zh-CN', {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
@@ -306,7 +306,7 @@ function updateTradeHistory(agentName) {
         tradeItem.innerHTML = `
             <div class="trade-icon ${iconClass}">${icon}</div>
             <div class="trade-details">
-                <div class="trade-action">${actionText} ${trade.amount} shares of ${trade.symbol}</div>
+                <div class="trade-action">${actionText} ${trade.amount} 股 ${trade.symbol}</div>
                 <div class="trade-meta">${formattedDate}</div>
             </div>
         `;
@@ -337,7 +337,7 @@ function updateMarketUI() {
         // Both 'cn' and 'cn_hour' keep the main CN button active
         if (cnBtn) cnBtn.classList.add('active');
         if (granularityWrapper) granularityWrapper.classList.remove('hidden');
-        
+
         if (currentMarket === 'cn_hour') {
             if (hourlyBtn) hourlyBtn.classList.add('active');
         } else {
@@ -355,7 +355,7 @@ function setupEventListeners() {
     // Market switching
     const usMarketBtn = document.getElementById('usMarketBtn');
     const cnMarketBtn = document.getElementById('cnMarketBtn');
-    
+
     // Granularity switching
     const dailyBtn = document.getElementById('dailyBtn');
     const hourlyBtn = document.getElementById('hourlyBtn');

@@ -1,6 +1,5 @@
 {
-  "agent_type": "BaseAgentAStock_Hour",
-  "market": "cn",
+  "agent_type": "BaseAgent_Hour",
   "date_range": {
     "init_date": "2025-11-30 8:30:00",
     "end_date": "2029-12-30 16:00:00"
@@ -29,10 +28,9 @@
     "max_steps": 30,
     "max_retries": 3,
     "base_delay": 1.0,
-    "initial_cash": 100000.0,
-    "verbose": false
+    "initial_cash": 10000.0
   },
   "log_config": {
-    "log_path": "./data/astock_hour_agent_data"
+    "log_path": "./data/ustock_hour_agent_data"
   }
 }

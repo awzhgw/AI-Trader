@@ -14,6 +14,6 @@ cd /d "%SCRIPT_DIR%\.."
 set "PROJECT_ROOT=%CD%"
 
 echo [Step 3] Starting Main Trading Agent...
-%PYTHON_CMD% main.py configs/default_hour_config.json
+%PYTHON_CMD% main.py configs/ustock_hour_config.json
 echo Agent stopped.
 pause

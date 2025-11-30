@@ -193,7 +193,7 @@ class TransactionLoader {
 
     // Format currency
     formatCurrency(value) {
-        if (value === null || value === undefined) return 'N/A';
+        if (value === null || value === undefined) return '暂无';
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
@@ -204,7 +204,7 @@ class TransactionLoader {
 
     // Format percent
     formatPercent(value) {
-        if (value === null || value === undefined) return 'N/A';
+        if (value === null || value === undefined) return '暂无';
         const sign = value >= 0 ? '+' : '';
         return `${sign}${value.toFixed(2)}%`;
     }
@@ -212,7 +212,7 @@ class TransactionLoader {
     // Format date/time
     formatDateTime(dateStr) {
         const date = new Date(dateStr);
-        return date.toLocaleString('en-US', {
+        return date.toLocaleString('zh-CN', {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',

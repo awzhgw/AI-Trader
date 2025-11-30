@@ -29,7 +29,7 @@ function loadIconImage(iconPath) {
             resolve(iconImageCache[iconPath]);
             return;
         }
-        
+
         const img = new Image();
         img.onload = () => {
             iconImageCache[iconPath] = img;
@@ -112,7 +112,7 @@ async function loadDataAndRefresh() {
 
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('Failed to load trading data. Please check console for details.');
+        alert('加载交易数据失败。请查看控制台了解详情。');
     } finally {
         hideLoading();
     }
@@ -125,7 +125,7 @@ async function init() {
 
     // Load initial data
     await loadDataAndRefresh();
-    
+
     // Initialize UI state
     updateMarketUI();
 }
@@ -170,7 +170,7 @@ function updateStats() {
         if (!dateStr) return 'N/A';
         // Parse date string (handles both "2025-10-01" and "2025-10-01 10:00:00" formats)
         const date = new Date(dateStr);
-        return date.toLocaleString('en-US', {
+        return date.toLocaleString('zh-CN', {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
@@ -178,11 +178,11 @@ function updateStats() {
     };
 
     document.getElementById('trading-period').textContent = minDate && maxDate ?
-        `${formatDateRange(minDate)} to ${formatDateRange(maxDate)}` : 'N/A';
+        `${formatDateRange(minDate)} 至 ${formatDateRange(maxDate)}` : '暂无';
     document.getElementById('best-performer').textContent = bestAgent ?
-        dataLoader.getAgentDisplayName(bestAgent) : 'N/A';
+        dataLoader.getAgentDisplayName(bestAgent) : '暂无';
     document.getElementById('avg-return').textContent = bestAgent ?
-        dataLoader.formatPercent(bestReturn) : 'N/A';
+        dataLoader.formatPercent(bestReturn) : '暂无';
 }
 
 // Create the main chart
@@ -356,7 +356,7 @@ function createChart() {
                         if (iconImageCache[dataset.agentIcon]) {
                             const img = iconImageCache[dataset.agentIcon];
                             const imgSize = iconSize * 0.6; // Icon slightly smaller than circle
-                            ctx.drawImage(img, iconX - imgSize/2, y - imgSize/2, imgSize, imgSize);
+                            ctx.drawImage(img, iconX - imgSize / 2, y - imgSize / 2, imgSize, imgSize);
                         }
 
                         ctx.restore();
@@ -418,7 +418,7 @@ function createChart() {
                 },
                 tooltip: {
                     enabled: false,
-                    external: function(context) {
+                    external: function (context) {
                         // Custom HTML tooltip
                         const tooltipModel = context.tooltip;
                         let tooltipEl = document.getElementById('chartjs-tooltip');
@@ -455,7 +455,7 @@ function createChart() {
                                 const dateStr = titleLines[0];
                                 if (dateStr && dateStr.includes(':')) {
                                     const date = new Date(dateStr);
-                                    titleHtml = date.toLocaleString('en-US', {
+                                    titleHtml = date.toLocaleString('zh-CN', {
                                         month: 'short',
                                         day: 'numeric',
                                         year: 'numeric',
@@ -564,7 +564,7 @@ function createChart() {
                         font: {
                             size: 11
                         },
-                        callback: function(value, index) {
+                        callback: function (value, index) {
                             // Format hourly timestamps for better readability
                             const dateStr = this.getLabelForValue(value);
                             if (!dateStr) return '';
@@ -591,7 +591,7 @@ function createChart() {
                     },
                     ticks: {
                         color: '#a0aec0',
-                        callback: function(value) {
+                        callback: function (value) {
                             return dataLoader.formatCurrency(value);
                         },
                         font: {
@@ -625,7 +625,7 @@ function createLegend() {
         }
 
         console.log(`[LEGEND ${index}] ${agentName} => COLOR: ${color}, isBenchmark: ${isBenchmark}`);
-        
+
         const returnValue = data.return;
         const returnClass = returnValue >= 0 ? 'positive' : 'negative';
         const iconPath = dataLoader.getAgentIcon(agentName);
@@ -653,7 +653,7 @@ function toggleScale() {
     isLogScale = !isLogScale;
 
     const button = document.getElementById('toggle-log');
-    button.textContent = isLogScale ? 'Log Scale' : 'Linear Scale';
+    button.textContent = isLogScale ? '对数刻度' : '线性刻度';
 
     // Update chart
     if (chartInstance) {
@@ -664,7 +664,7 @@ function toggleScale() {
 
 // Export chart data as CSV
 function exportData() {
-    let csv = 'Date,';
+    let csv = '日期,';
 
     // Header row with agent names
     const agentNames = Object.keys(allAgentsData);
@@ -695,7 +695,7 @@ function exportData() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'aitrader_asset_evolution.csv';
+    a.download = 'aitrader_资产演变.csv';
     a.click();
     window.URL.revokeObjectURL(url);
 }
@@ -722,14 +722,14 @@ function updateMarketUI() {
         // Both 'cn' and 'cn_hour' keep the main CN button active
         if (cnBtn) cnBtn.classList.add('active');
         if (granularityWrapper) granularityWrapper.classList.remove('hidden');
-        
+
         if (currentMarket === 'cn_hour') {
             if (hourlyBtn) hourlyBtn.classList.add('active');
         } else {
             if (dailyBtn) dailyBtn.classList.add('active');
         }
     }
-    
+
     updateMarketSubtitle();
 }
 
@@ -741,7 +741,7 @@ function setupEventListeners() {
     // Market switching
     const usMarketBtn = document.getElementById('usMarketBtn');
     const cnMarketBtn = document.getElementById('cnMarketBtn');
-    
+
     // Granularity switching
     const dailyBtn = document.getElementById('dailyBtn');
     const hourlyBtn = document.getElementById('hourlyBtn');

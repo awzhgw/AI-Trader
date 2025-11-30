@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <title>Debug Data</title>
+    <title>数据调试</title>
 </head>
+
 <body>
-    <h1>Checking data loading...</h1>
+    <h1>正在检查数据加载...</h1>
     <pre id="output"></pre>
     <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
     <script src="assets/js/config-loader.js"></script>
@@ -12,32 +14,33 @@
     <script>
         async function test() {
             const output = document.getElementById('output');
-            
+
             try {
                 // Load config
                 await window.configLoader.loadConfig();
-                output.innerHTML += 'Config loaded\n';
-                
+                output.innerHTML += '配置已加载\n';
+
                 // Create data loader
                 const dataLoader = new DataLoader();
-                output.innerHTML += 'DataLoader created\n';
-                
+                output.innerHTML += '数据加载器已创建\n';
+
                 // Load agent list
                 const agents = await dataLoader.loadAgentList();
-                output.innerHTML += `Agents found: ${JSON.stringify(agents)}\n`;
-                
+                output.innerHTML += `发现代理: ${JSON.stringify(agents)}\n`;
+
                 // Try loading first agent
                 if (agents.length > 0) {
-                    output.innerHTML += `\nLoading data for ${agents[0]}...\n`;
+                    output.innerHTML += `\n正在加载 ${agents[0]} 的数据...\n`;
                     const data = await dataLoader.loadAgentData(agents[0]);
-                    output.innerHTML += `Result: ${JSON.stringify(data, null, 2)}\n`;
+                    output.innerHTML += `结果: ${JSON.stringify(data, null, 2)}\n`;
                 }
             } catch (error) {
-                output.innerHTML += `\nERROR: ${error.message}\n${error.stack}\n`;
+                output.innerHTML += `\n错误: ${error.message}\n${error.stack}\n`;
             }
         }
-        
+
         test();
     </script>
 </body>
+
 </html>
